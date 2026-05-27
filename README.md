@@ -1,4 +1,4 @@
-# Motor Synergy Generalization Framework: New targets in Multi-Finger In-Hand Manipulation
+# Motor Synergy Generalization Framework — New Targets in Multi-Finger In-Hand Manipulation
 
 A data-driven framework for dexterous manipulation that transfers motor synergies extracted from a source task to accelerate learning on new, unseen target objects. A SAC+HER agent is first trained on block rotation to mastery; its joint-action trajectories are factorised via PCA into a compact synergy basis; target-task agents then act in this low-dimensional latent space, achieving faster convergence and higher sample efficiency than a full action-space baseline.
 
@@ -43,14 +43,16 @@ This project exploits **motor synergies**: the observation that coordinated fing
 
 All experiments use the **Shadow Dexterous Hand** with continuous touch sensors from [Gymnasium-Robotics](https://robotics.farama.org/):
 
-| Task | Environment ID |
-|------|---------------|
-| Source (block) | `HandManipulateBlockRotateXYZ_ContinuousTouchSensors-v1` |
-| Cylinder | `HandManipulateCylinderRotate_ContinuousTouchSensors-v1` |
-| Egg | `HandManipulateEggRotate_ContinuousTouchSensors-v1` |
-| Large cube | `HandManipulateBlockRotateXYZ_ContinuousTouchSensors-v1` |
-| Small cube | `HandManipulateBlockRotateXYZ_ContinuousTouchSensors-v1` |
-| Sphere | `HandManipulatePenRotate_ContinuousTouchSensors-v1` |
+| Task | Object | Environment ID |
+|------|--------|---------------|
+| Source | Standard cube (2.5 cm) | `HandManipulateBlockRotateXYZ_ContinuousTouchSensors-v1` |
+| Target | Large cube (3.0 cm) | `HandManipulateBlockRotateXYZ_ContinuousTouchSensors-v1` |
+| Target | Small cube (2.0 cm) | `HandManipulateBlockRotateXYZ_ContinuousTouchSensors-v1` |
+| Target | Egg | `HandManipulateEggRotateXYZ_ContinuousTouchSensors-v1` |
+| Target | Cylinder | `HandManipulateBlockRotateXYZ_ContinuousTouchSensors-v1` |
+| Target | Sphere | `HandManipulateBlockRotateXYZ_ContinuousTouchSensors-v1` |
+
+> All target objects (except for the egg) share the same base environment. Object geometry and dimensions are defined via custom MuJoCo XML files — the cube size variants change block dimensions, while the egg, cylinder, and sphere replace the object mesh entirely.
 
 The hand has **20 joints** (M=20), each controlled by a continuous torque command. The synergy basis reduces this to **K=5 latent dimensions**.
 
@@ -217,11 +219,11 @@ The videos below show both agents on the **Sphere** task after the same number o
 
 **Full action space** *(500k steps — still learning)*
 
-https://github.com/user-attachments/assets/1b483c52-468c-4118-9f2e-1309aeacea7b
+https://github.com/user-attachments/assets/51d9ec83-a407-4bfe-8e73-728304b20445
 
 **Synergy K=5** *(500k steps — already converged)*
 
-https://github.com/user-attachments/assets/39b43446-a10e-4c81-9334-c0ddbcd5a29e
+https://github.com/user-attachments/assets/1e61dc22-dd75-4ede-b01f-aecb41ed33f6
 
 ---
 
