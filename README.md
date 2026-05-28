@@ -1,6 +1,6 @@
 # Motor Synergy Generalization Framework: New Targets in Multi-Finger In-Hand Manipulation
 
-A A reinforcement learning framework for dexterous manipulation that transfers motor synergies extracted from a source task to accelerate learning on new, unseen target objects. A SAC+HER agent is first trained on block rotation to mastery; its joint-action trajectories are factorised via PCA into a compact synergy basis; target-task agents then act in this low-dimensional latent space, achieving faster convergence and higher sample efficiency than a full action-space baseline.
+A reinforcement learning framework for dexterous manipulation that transfers motor synergies extracted from a source task to accelerate learning on new, unseen target objects. A SAC+HER agent is first trained on block rotation to mastery; its joint-action trajectories are factorised via PCA into a compact synergy basis; target-task agents then act in this low-dimensional latent space, achieving faster convergence and higher sample efficiency than a full action-space baseline.
 
 > **Author:** Serena Trovalusci  
 > **Supervisor:** Alessandro De Luca · **Co-supervisor:** Mitsuhiro Hayashibe  
