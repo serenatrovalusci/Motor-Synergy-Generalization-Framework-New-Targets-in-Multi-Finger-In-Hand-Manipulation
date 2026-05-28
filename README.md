@@ -6,7 +6,7 @@ A A reinforcement learning framework for dexterous manipulation that transfers m
 > **Supervisor:** Alessandro De Luca · **Co-supervisor:** Mitsuhiro Hayashibe  
 > **Institution:** Dipartimento di Ingegneria Informatica, Automatica e Gestionale (DIAG), Sapienza University of Rome  
 > **Thesis:** [`report&slides/Tesi.pdf`](report&slides/Tesi.pdf)  
-> **Slides:** [`report&slides/defense_presentation.pdf`](report&slides/defense_presentation.pdf)
+> **Slides:** [`report&slides/Presentation.pdf`](report&slides/Presentation.pdf)
 
 ---
 
