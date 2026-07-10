@@ -85,7 +85,7 @@ from stable_baselines3.common.callbacks import (
 )
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.utils import set_random_seed
-from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
 
 
 # =============================================================================
@@ -298,12 +298,25 @@ def make_full_env(env_id, render=False, seed=None):
 
 
 def build_train_eval_envs(env_id, synergy_model, act_scale=3.0,
-                           nonnegative_activities=False, seed=0):
-    """Build (train_env, eval_env) VecNormalize pairs for synergy mode."""
-    train_env = DummyVecEnv([make_synergy_env(
-        env_id, synergy_model, act_scale=act_scale,
-        nonnegative_activities=nonnegative_activities, render=False, seed=seed,
-    )])
+                           nonnegative_activities=False, seed=0, n_envs=1):
+    """Build (train_env, eval_env) VecNormalize pairs for synergy mode.
+
+    ``train_env`` runs ``n_envs`` copies in parallel: ``SubprocVecEnv`` (one
+    OS process per env) if ``n_envs > 1``, else the single-process
+    ``DummyVecEnv``. Each copy gets a distinct seed (``seed + i``) so the
+    parallel rollouts are not correlated. ``eval_env`` always stays a single
+    environment.
+    """
+    train_thunks = [
+        make_synergy_env(
+            env_id, synergy_model, act_scale=act_scale,
+            nonnegative_activities=nonnegative_activities, render=False,
+            seed=seed + i,
+        )
+        for i in range(n_envs)
+    ]
+    vec_env_cls = SubprocVecEnv if n_envs > 1 else DummyVecEnv
+    train_env = vec_env_cls(train_thunks)
     train_env = VecNormalize(train_env, norm_obs=True, norm_reward=False, clip_obs=10.0)
 
     eval_env = DummyVecEnv([make_synergy_env(
@@ -317,9 +330,17 @@ def build_train_eval_envs(env_id, synergy_model, act_scale=3.0,
     return train_env, eval_env
 
 
-def build_train_eval_envs_full(env_id, seed=0):
-    """Build (train_env, eval_env) VecNormalize pairs for full action space mode."""
-    train_env = DummyVecEnv([make_full_env(env_id, render=False, seed=seed)])
+def build_train_eval_envs_full(env_id, seed=0, n_envs=1):
+    """Build (train_env, eval_env) VecNormalize pairs for full action space mode.
+
+    See ``build_train_eval_envs`` for the parallelisation strategy.
+    """
+    train_thunks = [
+        make_full_env(env_id, render=False, seed=seed + i)
+        for i in range(n_envs)
+    ]
+    vec_env_cls = SubprocVecEnv if n_envs > 1 else DummyVecEnv
+    train_env = vec_env_cls(train_thunks)
     train_env = VecNormalize(train_env, norm_obs=True, norm_reward=False, clip_obs=10.0)
 
     eval_env = DummyVecEnv([make_full_env(env_id, render=False, seed=seed + 10_000)])
@@ -472,6 +493,17 @@ def main():
     parser.add_argument("--timesteps", type=int, default=2_000_000)
     parser.add_argument("--eval-freq", type=int, default=100_000)
     parser.add_argument("--eval-episodes", type=int, default=50)
+    parser.add_argument(
+        "--n-envs", type=int, default=1,
+        help="Number of parallel training environments. n_envs=1 uses "
+             "DummyVecEnv (current default behaviour); n_envs>1 uses "
+             "SubprocVecEnv (one OS process per env), which gives real "
+             "wall-clock speedup since MuJoCo stepping is CPU-bound. Each "
+             "vec-env round then collects n-envs transitions before every "
+             "training call, so consider scaling up --gradient-steps "
+             "roughly proportionally to keep the update-to-data ratio "
+             "comparable to an n_envs=1 run.",
+    )
 
     # --- SAC / HER hyperparameters ------------------------------------------
     parser.add_argument("--gamma", type=float, default=0.99)
@@ -577,9 +609,17 @@ def main():
                 dir=args.save_dir,
             )
 
+        if args.n_envs > 1:
+            print(f"Parallel training envs: {args.n_envs} (SubprocVecEnv). "
+                  f"gradient_steps={args.gradient_steps} — consider scaling this "
+                  f"up (e.g. x{args.n_envs}) to keep the update-to-data ratio "
+                  f"comparable to a single-env run.")
+
         if args.full_action_space:
             print("Mode: FULL action space")
-            train_env, eval_env = build_train_eval_envs_full(args.env_id, seed=args.seed)
+            train_env, eval_env = build_train_eval_envs_full(
+                args.env_id, seed=args.seed, n_envs=args.n_envs,
+            )
         else:
             print(f"Mode: SYNERGY  K={synergy_model.n_synergies}")
             train_env, eval_env = build_train_eval_envs(
@@ -587,6 +627,7 @@ def main():
                 act_scale=args.act_scale,
                 nonnegative_activities=args.nonnegative_activities,
                 seed=args.seed,
+                n_envs=args.n_envs,
             )
 
         action_dim = train_env.action_space.shape[-1]
