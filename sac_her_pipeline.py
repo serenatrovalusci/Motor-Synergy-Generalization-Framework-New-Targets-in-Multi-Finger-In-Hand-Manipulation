@@ -492,6 +492,28 @@ def main():
              "Defaults to <save-dir>/trajectory.npz.",
     )
 
+    # --- Weights & Biases -----------------------------------------------------
+    parser.add_argument(
+        "--wandb", action="store_true",
+        help="Enable Weights & Biases logging. Mirrors all TensorBoard scalars "
+             "(rollout/eval/time metrics) via sync_tensorboard and periodically "
+             "uploads model checkpoints.",
+    )
+    parser.add_argument("--wandb-project", type=str, default="motor-synergy-generalization")
+    parser.add_argument("--wandb-entity", type=str, default=None)
+    parser.add_argument(
+        "--wandb-run-name", type=str, default=None,
+        help="Defaults to the --save-dir basename.",
+    )
+    parser.add_argument(
+        "--wandb-group", type=str, default=None,
+        help="Group related runs, e.g. by target object or ablation.",
+    )
+    parser.add_argument(
+        "--wandb-tags", type=str, default=None,
+        help="Comma-separated tags, e.g. 'synergy,K5,egg'.",
+    )
+
     # --- Logging / hardware -------------------------------------------------
     parser.add_argument("--time-log-every", type=int, default=10_000)
     parser.add_argument(
@@ -537,6 +559,23 @@ def main():
     if args.task == "train":
         with open(os.path.join(args.save_dir, "args.json"), "w") as f:
             json.dump(vars(args), f, indent=2, sort_keys=True)
+
+        wandb_run = None
+        if args.wandb:
+            import wandb
+
+            run_name = args.wandb_run_name or os.path.basename(os.path.normpath(args.save_dir))
+            tags = [t.strip() for t in args.wandb_tags.split(",")] if args.wandb_tags else None
+            wandb_run = wandb.init(
+                project=args.wandb_project,
+                entity=args.wandb_entity,
+                name=run_name,
+                group=args.wandb_group,
+                tags=tags,
+                config=vars(args),
+                sync_tensorboard=True,
+                dir=args.save_dir,
+            )
 
         if args.full_action_space:
             print("Mode: FULL action space")
@@ -603,9 +642,23 @@ def main():
             TimeLoggingCallback(log_every_steps=args.time_log_every),
         ]
 
-        model.learn(total_timesteps=args.timesteps, callback=callbacks)
-        train_env.close()
-        eval_env.close()
+        if wandb_run is not None:
+            from wandb.integration.sb3 import WandbCallback
+
+            callbacks.append(WandbCallback(
+                model_save_path=os.path.join(args.save_dir, "wandb_models"),
+                model_save_freq=args.eval_freq,
+                verbose=1,
+            ))
+
+        try:
+            model.learn(total_timesteps=args.timesteps, callback=callbacks)
+        finally:
+            train_env.close()
+            eval_env.close()
+            if wandb_run is not None:
+                wandb_run.finish()
+
         print(f"Best model : {os.path.join(best_dir, 'best_model.zip')}")
         print(f"Best vecnorm: {os.path.join(best_dir, 'vecnorm_best.pkl')}")
         return
