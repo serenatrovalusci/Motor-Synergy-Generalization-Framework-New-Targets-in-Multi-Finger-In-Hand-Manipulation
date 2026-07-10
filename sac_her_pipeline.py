@@ -377,6 +377,38 @@ def load_synergy_bundle(path: str):
     return packed
 
 
+def resolve_best_model_paths(save_dir: str):
+    """
+    Locate best_model.zip + vecnorm_best.pkl under ``save_dir``.
+
+    Supports two layouts:
+      - Nested:  <save_dir>/best/best_model.zip   (produced by --task train)
+      - Flat:    <save_dir>/best_model.zip         (the curated pre-trained
+                 bundles shipped under models/synergy_K5/* and
+                 models/full_action/* — only the best checkpoint is small
+                 enough to commit to GitHub, so intermediate ckpts/ and
+                 tb_logs/ aren't included there)
+
+    Nested is checked first so a save-dir that was just trained resolves
+    correctly even if it happens to also contain stray flat files.
+    """
+    nested_model = os.path.join(save_dir, "best", "best_model.zip")
+    nested_vecnorm = os.path.join(save_dir, "best", "vecnorm_best.pkl")
+    if os.path.exists(nested_model) and os.path.exists(nested_vecnorm):
+        return nested_model, nested_vecnorm
+
+    flat_model = os.path.join(save_dir, "best_model.zip")
+    flat_vecnorm = os.path.join(save_dir, "vecnorm_best.pkl")
+    if os.path.exists(flat_model) and os.path.exists(flat_vecnorm):
+        return flat_model, flat_vecnorm
+
+    raise FileNotFoundError(
+        f"No best_model.zip / vecnorm_best.pkl found under '{save_dir}'. Looked for:\n"
+        f"  {nested_model}\n  {nested_vecnorm}\nand:\n"
+        f"  {flat_model}\n  {flat_vecnorm}"
+    )
+
+
 # =============================================================================
 # Evaluation loop
 # =============================================================================
@@ -493,6 +525,12 @@ def main():
     parser.add_argument("--timesteps", type=int, default=2_000_000)
     parser.add_argument("--eval-freq", type=int, default=100_000)
     parser.add_argument("--eval-episodes", type=int, default=50)
+    parser.add_argument(
+        "--render", action="store_true",
+        help="Open a live MuJoCo window during --task eval/collect "
+             "(render_mode='human'), so you can watch (and screen-record) "
+             "the loaded policy directly. Ignored during --task train.",
+    )
     parser.add_argument(
         "--n-envs", type=int, default=1,
         help="Number of parallel training environments. n_envs=1 uses "
@@ -707,21 +745,16 @@ def main():
     # =========================================================================
     # EVAL / COLLECT — load best model + VecNormalize
     # =========================================================================
-    model_path = os.path.join(args.save_dir, "best", "best_model.zip")
-    vecnorm_path = os.path.join(args.save_dir, "best", "vecnorm_best.pkl")
-
-    if not os.path.exists(model_path):
-        raise FileNotFoundError(f"No best model found at {model_path}")
-    if not os.path.exists(vecnorm_path):
-        raise FileNotFoundError(f"No VecNormalize found at {vecnorm_path}")
+    model_path, vecnorm_path = resolve_best_model_paths(args.save_dir)
 
     if args.full_action_space:
-        raw_env = DummyVecEnv([make_full_env(args.env_id)])
+        raw_env = DummyVecEnv([make_full_env(args.env_id, render=args.render)])
     else:
         raw_env = DummyVecEnv([make_synergy_env(
             args.env_id, synergy_model,
             act_scale=args.act_scale,
             nonnegative_activities=args.nonnegative_activities,
+            render=args.render,
         )])
 
     eval_env = VecNormalize.load(vecnorm_path, raw_env)

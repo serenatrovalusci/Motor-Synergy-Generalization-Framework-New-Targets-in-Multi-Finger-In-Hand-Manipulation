@@ -40,6 +40,7 @@ def eval_synergy_replay(
     env = gym.make(env_id, render_mode="human")
 
     successes, returns, lengths, mse_errors = [], [], [], []
+    viewer_cleaned_up = False
 
     for i in range(n_episodes):
         actions_orig = data[i]  # (T, M)
@@ -68,6 +69,16 @@ def eval_synergy_replay(
         for t in range(T):
             a = recon[t]
             obs, reward, done, truncated, info = env.step(a)
+
+            # Hide the on-screen HUD overlay for clean video capture. Pure
+            # rendering option — does not affect simulation. Applied once,
+            # as soon as the viewer window exists.
+            if not viewer_cleaned_up:
+                viewer = env.unwrapped.mujoco_renderer.viewer
+                if viewer is not None:
+                    viewer._hide_menu = True
+                    viewer_cleaned_up = True
+
             ep_ret += float(reward)
             if info.get("is_success", 0):
                 success = 1
