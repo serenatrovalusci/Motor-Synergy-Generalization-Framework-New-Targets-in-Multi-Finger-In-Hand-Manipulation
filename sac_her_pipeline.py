@@ -409,6 +409,23 @@ def resolve_best_model_paths(save_dir: str):
     )
 
 
+def get_mujoco_viewer(vec_env):
+    """
+    Reach the underlying MuJoCo ``WindowViewer`` through the
+    VecNormalize -> DummyVecEnv -> Monitor -> [HandSynergyEnv] -> MujocoEnv
+    wrapper stack built by this module. Returns None if unavailable (e.g.
+    render_mode wasn't 'human', or the window hasn't been created yet).
+    """
+    try:
+        gym_env = vec_env.venv.envs[0]
+    except (AttributeError, IndexError):
+        return None
+    gym_env = getattr(gym_env, "env", gym_env)  # unwrap Monitor
+    gym_env = getattr(gym_env, "base_env", gym_env)  # unwrap HandSynergyEnv, if present
+    renderer = getattr(gym_env.unwrapped, "mujoco_renderer", None)
+    return getattr(renderer, "viewer", None) if renderer is not None else None
+
+
 # =============================================================================
 # Evaluation loop
 # =============================================================================
@@ -417,6 +434,7 @@ def final_eval_loop(model, eval_env, n_episodes=100, deterministic=True):
     """Run deterministic rollouts and print success rate, return, and timing."""
     successes, ep_returns, ep_lengths, op_times = [], [], [], []
     dt = 0.04  # MuJoCo timestep
+    hud_hidden = False
 
     for _ in range(n_episodes):
         obs = eval_env.reset()
@@ -427,6 +445,15 @@ def final_eval_loop(model, eval_env, n_episodes=100, deterministic=True):
         while not done:
             action, _ = model.predict(obs, deterministic=deterministic)
             obs, rewards, dones, infos = eval_env.step(action)
+
+            # Hide the on-screen HUD overlay for clean video capture (only
+            # relevant when rendering). Pure rendering option, applied once.
+            if not hud_hidden:
+                viewer = get_mujoco_viewer(eval_env)
+                if viewer is not None:
+                    viewer._hide_menu = True
+                    hud_hidden = True
+
             ep_ret += float(rewards[0])
             ep_len += 1
             if goal_time is None and infos[0].get("is_success", 0) == 1:
@@ -459,6 +486,7 @@ def collect_trajectories(model, eval_env, n_episodes, save_path, deterministic=T
     ``"actions"``. Only action trajectories are stored (no observations).
     """
     all_ep_actions = []
+    hud_hidden = False
 
     for ep in range(n_episodes):
         obs = eval_env.reset()
@@ -469,6 +497,13 @@ def collect_trajectories(model, eval_env, n_episodes, save_path, deterministic=T
             action, _ = model.predict(obs, deterministic=deterministic)
             ep_actions.append(np.array(action[0], dtype=np.float32))
             obs, _, dones, _ = eval_env.step(action)
+
+            if not hud_hidden:
+                viewer = get_mujoco_viewer(eval_env)
+                if viewer is not None:
+                    viewer._hide_menu = True
+                    hud_hidden = True
+
             done = bool(dones[0])
 
         all_ep_actions.append(np.stack(ep_actions, axis=0))
@@ -615,18 +650,19 @@ def main():
         print(f"Synergy model: K={synergy_model.n_synergies}, "
               f"method={getattr(synergy_model, 'method', 'NA')}")
 
-    # Output directories
-    os.makedirs(args.save_dir, exist_ok=True)
-    best_dir = os.path.join(args.save_dir, "best")
-    ckpt_dir = os.path.join(args.save_dir, "ckpts")
-    eval_log_dir = os.path.join(args.save_dir, "eval_logs")
-    for d in [best_dir, ckpt_dir, eval_log_dir]:
-        os.makedirs(d, exist_ok=True)
-
     # =========================================================================
     # TRAIN
     # =========================================================================
     if args.task == "train":
+        # Output directories (only needed for a fresh training run — eval/collect
+        # just read an existing save-dir and shouldn't create empty scaffolding).
+        os.makedirs(args.save_dir, exist_ok=True)
+        best_dir = os.path.join(args.save_dir, "best")
+        ckpt_dir = os.path.join(args.save_dir, "ckpts")
+        eval_log_dir = os.path.join(args.save_dir, "eval_logs")
+        for d in [best_dir, ckpt_dir, eval_log_dir]:
+            os.makedirs(d, exist_ok=True)
+
         with open(os.path.join(args.save_dir, "args.json"), "w") as f:
             json.dump(vars(args), f, indent=2, sort_keys=True)
 
@@ -695,18 +731,25 @@ def main():
             tensorboard_log=os.path.join(args.save_dir, "tb_logs"),
         )
 
+        # EvalCallback/CheckpointCallback count calls to _on_step(), which fires
+        # once per VecEnv round (i.e. once every n_envs real timesteps) rather
+        # than once per real timestep. Divide by n_envs so eval_freq/save_freq
+        # keep meaning "real env timesteps" regardless of parallelism.
+        eval_freq = max(args.eval_freq // args.n_envs, 1)
+        checkpoint_save_freq = max(50_000 // args.n_envs, 1)
+
         callbacks = [
             EvalCallback(
                 eval_env,
                 best_model_save_path=best_dir,
                 log_path=eval_log_dir,
-                eval_freq=args.eval_freq,
+                eval_freq=eval_freq,
                 n_eval_episodes=args.eval_episodes,
                 deterministic=True,
                 render=False,
             ),
             CheckpointCallback(
-                save_freq=50_000,
+                save_freq=checkpoint_save_freq,
                 save_path=ckpt_dir,
                 name_prefix="sac_her_hand",
                 save_replay_buffer=False,
