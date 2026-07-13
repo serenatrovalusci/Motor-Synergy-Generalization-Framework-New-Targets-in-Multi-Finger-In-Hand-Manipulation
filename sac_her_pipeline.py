@@ -561,6 +561,13 @@ def main():
     parser.add_argument("--eval-freq", type=int, default=100_000)
     parser.add_argument("--eval-episodes", type=int, default=50)
     parser.add_argument(
+        "--checkpoint-freq", type=int, default=500_000,
+        help="Real env timesteps between full model checkpoints "
+             "(ckpts/*.zip). Kept coarse by default since checkpoints are "
+             "for resuming/inspection, not for the eval/success_rate plot "
+             "(that curve comes from --eval-freq instead).",
+    )
+    parser.add_argument(
         "--render", action="store_true",
         help="Open a live MuJoCo window during --task eval/collect "
              "(render_mode='human'), so you can watch (and screen-record) "
@@ -736,7 +743,7 @@ def main():
         # than once per real timestep. Divide by n_envs so eval_freq/save_freq
         # keep meaning "real env timesteps" regardless of parallelism.
         eval_freq = max(args.eval_freq // args.n_envs, 1)
-        checkpoint_save_freq = max(50_000 // args.n_envs, 1)
+        checkpoint_save_freq = max(args.checkpoint_freq // args.n_envs, 1)
 
         callbacks = [
             EvalCallback(
