@@ -28,10 +28,11 @@ Module layout
 Example
 -------
     python synergy_extract_analyze.py \\
-        --npz-path data/hand_actions.npz \\
+        --npz-path trajectory.npz \\
         --array-key actions \\
         --method pca \\
-        --n-synergies 6 \\
+        --n-synergies 5 \\
+        --out-path pca/block_K5 \\
         --k-list "1,2,4,6,8,10,12,16,20" \\
         --traj-idx 0
 """
@@ -467,10 +468,38 @@ def main():
     assert recon.shape[0] == N and recon.shape[1] == T, f"recon shape {recon.shape} unexpected"
 
     # -------------------------------------------------------------------------
+    # 2b) Persist the fitted synergy bundle (pickle) so downstream scripts
+    #     (e.g. sac_her_pipeline.py --synergy-path ...) can load it.
+    # -------------------------------------------------------------------------
+    out_path = args.out_path
+    if out_path is None:
+        out_path = os.path.splitext(args.npz_path)[0] + f"_synergy_{args.method}_K{K}.pkl"
+    bundle = {
+        "synergy_model": model,
+        "method": args.method,
+        "n_synergies": K,
+        "dof": M,
+        "array_key": args.array_key,
+        "source_npz": args.npz_path,
+    }
+    with open(out_path, "wb") as f:
+        pickle.dump(bundle, f)
+    print(f"[OK] Saved synergy bundle to: {os.path.abspath(out_path)}")
+
+    # -------------------------------------------------------------------------
     # 3) Range / distribution sanity checks on data and reconstruction.
     # -------------------------------------------------------------------------
-    summarize_ranges("DATA", data)
-    summarize_ranges("RECON", recon)
+    data_stats = summarize_ranges("DATA", data)
+    recon_stats = summarize_ranges("RECON", recon)
+
+    if args.save_recon:
+        recon_out = args.recon_out
+        if recon_out is None:
+            recon_out = os.path.splitext(args.npz_path)[0] + f"_recon_{args.method}_K{K}.npz"
+        stats = {f"data_{k}": v for k, v in data_stats.items()}
+        stats.update({f"recon_{k}": v for k, v in recon_stats.items()})
+        np.savez_compressed(recon_out, data=data, recon=recon, activities=activities, **stats)
+        print(f"[OK] Saved reconstruction artefact to: {os.path.abspath(recon_out)}")
 
     # -------------------------------------------------------------------------
     # 4) R^2 vs K with a TRAIN/TEST split *by trajectory* to avoid leakage.
