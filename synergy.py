@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.decomposition import PCA, NMF
 import torch
+import torch.nn as nn
 
 
 class SpatialSynergy:
@@ -105,6 +106,182 @@ class SpatialSynergy:
 
         return data
 
+
+
+class _AutoencoderNet(nn.Module):
+    """Shallow MLP autoencoder: dof -> hidden -> K -> hidden -> dof."""
+
+    def __init__(self, dof, n_synergies, hidden_dim):
+        super().__init__()
+        self.encoder = nn.Sequential(
+            nn.Linear(dof, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, n_synergies),
+        )
+        self.decoder = nn.Sequential(
+            nn.Linear(n_synergies, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, dof),
+            nn.Tanh(),  # joint actions live in [-1, 1]
+        )
+
+    def encode(self, x):
+        return self.encoder(x)
+
+    def decode(self, z):
+        return self.decoder(z)
+
+    def forward(self, x):
+        return self.decode(self.encode(x))
+
+
+class AutoencoderSynergy:
+    """Nonlinear synergy extraction via a shallow autoencoder.
+
+    Mirrors the ``SpatialSynergy`` interface (``n_synergies``, ``dof``,
+    ``extract``/``encode``/``decode``) so it is a drop-in replacement in
+    ``synergy_extract_analyze.py`` and ``sac_her_pipeline.py``. Unlike
+    PCA/NMF the decoder is a nonlinear MLP, so there is no fixed weight
+    matrix -- ``self.synergies`` stays ``None``.
+    """
+
+    def __init__(
+        self,
+        n_synergies,
+        method="autoencoder",
+        hidden_dim=64,
+        epochs=200,
+        batch_size=256,
+        lr=1e-3,
+        weight_decay=0.0,
+        val_split=0.1,
+        patience=20,
+        device=None,
+        seed=0,
+        verbose=True,
+    ):
+        """
+        Args:
+            n_synergies: Bottleneck dimension K.
+            hidden_dim: Width of the single hidden layer in encoder/decoder.
+            epochs: Max training epochs (may stop early, see `patience`).
+            batch_size: Minibatch size for SGD.
+            lr: Adam learning rate.
+            val_split: Fraction of (flattened) samples held out for early stopping.
+            patience: Stop after this many epochs without val-loss improvement.
+            device: "cuda"/"cpu"/"mps". Defaults to cuda if available, else cpu.
+            verbose: Print periodic training progress.
+        """
+        self.n_synergies = n_synergies
+        self.method = method
+        self.hidden_dim = hidden_dim
+        self.epochs = epochs
+        self.batch_size = batch_size
+        self.lr = lr
+        self.weight_decay = weight_decay
+        self.val_split = val_split
+        self.patience = patience
+        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.seed = seed
+        self.verbose = verbose
+
+        # Initialize variables
+        self.model = None
+        self.synergies = None  # no fixed linear basis for a nonlinear decoder
+        self.dof = None
+
+    def extract(self, data):
+        """Train the autoencoder on given data.
+
+        Data is assumed to have the shape (#trajectories, length, #DoF).
+        Returns None (there is no fixed weight matrix to hand back, unlike
+        the linear methods in `SpatialSynergy`).
+        """
+        self.dof = data.shape[-1]
+        flat = np.asarray(data, dtype=np.float32).reshape(-1, self.dof)
+
+        torch.manual_seed(self.seed)
+        rng = np.random.default_rng(self.seed)
+        n = flat.shape[0]
+        n_val = max(1, int(n * self.val_split))
+        perm = rng.permutation(n)
+        val_idx, train_idx = perm[:n_val], perm[n_val:]
+
+        x_train = torch.from_numpy(flat[train_idx]).to(self.device)
+        x_val = torch.from_numpy(flat[val_idx]).to(self.device)
+
+        self.model = _AutoencoderNet(self.dof, self.n_synergies, self.hidden_dim).to(self.device)
+        opt = torch.optim.Adam(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+
+        best_val, best_state, bad_epochs = float("inf"), None, 0
+        n_train = x_train.shape[0]
+
+        for epoch in range(self.epochs):
+            self.model.train()
+            for batch_idx in torch.randperm(n_train, device=self.device).split(self.batch_size):
+                batch = x_train[batch_idx]
+                opt.zero_grad()
+                loss = torch.mean((self.model(batch) - batch) ** 2)
+                loss.backward()
+                opt.step()
+
+            self.model.eval()
+            with torch.no_grad():
+                val_loss = torch.mean((self.model(x_val) - x_val) ** 2).item()
+
+            if val_loss < best_val - 1e-6:
+                best_val, bad_epochs = val_loss, 0
+                best_state = {k: v.clone() for k, v in self.model.state_dict().items()}
+            else:
+                bad_epochs += 1
+
+            if self.verbose and (epoch % max(1, self.epochs // 10) == 0 or epoch == self.epochs - 1):
+                print(f"  [autoencoder K={self.n_synergies}] epoch {epoch+1}/{self.epochs}  val_mse={val_loss:.6f}")
+
+            if bad_epochs >= self.patience:
+                if self.verbose:
+                    print(f"  [autoencoder K={self.n_synergies}] early stop at epoch {epoch+1} "
+                          f"(best val_mse={best_val:.6f})")
+                break
+
+        if best_state is not None:
+            self.model.load_state_dict(best_state)
+        self.model.eval()
+
+        return None
+
+    def encode(self, data):
+        """Encode given data to synergy activities.
+
+        Data is assumed to have the shape (#trajectories, length, #DoF).
+        Synergy activities have the shape (#trajectories, length, #synergies).
+        """
+        if self.model is None:
+            return None
+
+        data_shape = data.shape
+        flat = np.asarray(data, dtype=np.float32).reshape(-1, self.dof)
+        with torch.no_grad():
+            z = self.model.encode(torch.from_numpy(flat).to(self.device)).cpu().numpy()
+
+        return z.reshape((data_shape[0], data_shape[1], self.n_synergies))
+
+    def decode(self, activities):
+        """Decode given synergy activities to data.
+
+        Synergy activities have the shape (#trajectories, length, #synergies).
+        Data is assumed to have the shape (#trajectories, length, #DoF).
+        """
+        if self.model is None:
+            return None
+
+        activities = np.asarray(activities)
+        act_shape = activities.shape
+        flat = activities.reshape(-1, self.n_synergies).astype(np.float32)
+        with torch.no_grad():
+            x = self.model.decode(torch.from_numpy(flat).to(self.device)).cpu().numpy()
+
+        return x.reshape((act_shape[0], act_shape[1], self.dof))
 
 
 class SpatioTemporalSynergy:

@@ -46,8 +46,9 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 
 # Project-local synergy implementation: must expose
-# ``extract / encode / decode`` and a ``synergies`` attribute of shape (K, M).
-from synergy import SpatialSynergy
+# ``extract / encode / decode`` and a ``synergies`` attribute of shape (K, M)
+# (``synergies`` is None for the nonlinear autoencoder method).
+from synergy import SpatialSynergy, AutoencoderSynergy
 
 
 # =============================================================================
@@ -344,6 +345,33 @@ def plot_joint_synergy_contributions_grid(
 
 
 # =============================================================================
+# Model factory
+# =============================================================================
+
+def build_synergy_model(k, args, verbose=False):
+    """Construct a fresh, unfit synergy model for a given K.
+
+    Dispatches to :class:`AutoencoderSynergy` for ``--method autoencoder``
+    and to the linear :class:`SpatialSynergy` (pca / nmf / negative-nmf)
+    otherwise, so callers can treat every method uniformly via
+    ``extract`` / ``encode`` / ``decode``.
+    """
+    if args.method == "autoencoder":
+        return AutoencoderSynergy(
+            k,
+            hidden_dim=args.ae_hidden_dim,
+            epochs=args.ae_epochs,
+            batch_size=args.ae_batch_size,
+            lr=args.ae_lr,
+            patience=args.ae_patience,
+            val_split=args.ae_val_split,
+            seed=args.seed,
+            verbose=verbose,
+        )
+    return SpatialSynergy(k, method=args.method)
+
+
+# =============================================================================
 # Main entry point
 # =============================================================================
 
@@ -372,8 +400,9 @@ def main():
         "--method",
         type=str,
         default="pca",
-        choices=["pca", "nmf", "negative-nmf"],
-        help="Synergy extraction method.",
+        choices=["pca", "nmf", "negative-nmf", "autoencoder"],
+        help="Synergy extraction method. 'autoencoder' fits a nonlinear "
+             "MLP encoder/decoder instead of a linear basis (see --ae-* flags).",
     )
     parser.add_argument(
         "--n-synergies",
@@ -381,6 +410,20 @@ def main():
         default=5,
         help="Number of synergies K used for the bundle and the recon plots.",
     )
+
+    # --- Autoencoder hyperparameters (only used when --method autoencoder) --
+    parser.add_argument("--ae-hidden-dim", type=int, default=64,
+                         help="Width of the encoder/decoder hidden layer.")
+    parser.add_argument("--ae-epochs", type=int, default=200,
+                         help="Max training epochs (early stopping may cut this short).")
+    parser.add_argument("--ae-batch-size", type=int, default=256,
+                         help="Minibatch size for autoencoder training.")
+    parser.add_argument("--ae-lr", type=float, default=1e-3,
+                         help="Adam learning rate for autoencoder training.")
+    parser.add_argument("--ae-patience", type=int, default=20,
+                         help="Early-stopping patience (epochs without val-loss improvement).")
+    parser.add_argument("--ae-val-split", type=float, default=0.1,
+                         help="Fraction of (flattened) samples held out for early stopping.")
 
     # --- Output -------------------------------------------------------------
     parser.add_argument(
@@ -469,9 +512,12 @@ def main():
     # 2) Fit the chosen-K model used for the bundle and the per-synergy plots.
     # -------------------------------------------------------------------------
     K = int(args.n_synergies)
-    model = SpatialSynergy(K, method=args.method)
+    model = build_synergy_model(K, args, verbose=True)
     synergies = model.extract(data)
-    print("Synergies shape:", np.asarray(synergies).shape)
+    if synergies is not None:
+        print("Synergies shape:", np.asarray(synergies).shape)
+    else:
+        print("Synergies: N/A (nonlinear autoencoder decoder -- no fixed weight matrix)")
 
     activities = model.encode(data)          # (N, T, K)
     recon = model.decode(activities)         # (N, T, M)
@@ -537,12 +583,13 @@ def main():
     r2_mean_list = []
     for k in K_list:
         # Fit a fresh model for each K so the curve is comparable across K.
-        model_k = SpatialSynergy(k, method=args.method)
+        model_k = build_synergy_model(k, args, verbose=False)
         _ = model_k.extract(train_data)
         act_te = model_k.encode(test_data)
         recon_te = model_k.decode(act_te)
         r2_mean, _, _ = r2_per_dof_mean_std(test_data, recon_te)  # ignore std
         r2_mean_list.append(r2_mean)
+        print(f"[sweep] K={k:>3d}  R^2={r2_mean:.4f}")
 
     # Paper-style plot: marker line, dotted reference at R^2 = 0.95,
     # integer K on the x-axis, fixed y range so different runs are comparable.
@@ -562,71 +609,76 @@ def main():
     plt.show()
 
     # -------------------------------------------------------------------------
-    # 5) Synergy weight matrix as a heatmap with numeric annotations.
+    # 5-7) Weight-matrix-dependent diagnostics: heatmap, per-synergy bar
+    #      plots, and the joint x synergy contribution grid. These all read
+    #      model.synergies (K, M), which only exists for the linear methods
+    #      (pca / nmf / negative-nmf) -- the autoencoder's decoder is a
+    #      nonlinear MLP with no single fixed weight matrix to visualise.
     # -------------------------------------------------------------------------
-    W = np.asarray(model.synergies)   # (K, M)
+    if model.synergies is not None:
+        # 5) Synergy weight matrix as a heatmap with numeric annotations.
+        W = np.asarray(model.synergies)   # (K, M)
 
-    plt.figure(figsize=(12, 3))
-    im = plt.imshow(W, aspect="auto")
-    plt.colorbar(im, label="Weight")
+        plt.figure(figsize=(12, 3))
+        im = plt.imshow(W, aspect="auto")
+        plt.colorbar(im, label="Weight")
 
-    plt.yticks(range(W.shape[0]), [f"S{k+1}" for k in range(W.shape[0])])
-    plt.xticks(
-        range(W.shape[1]),
-        [str(i + 1) for i in range(W.shape[1])],
-        rotation=90,
-    )
-    plt.xlabel("Joint (DoF)")
-    plt.ylabel("Synergy")
-    plt.title("Spatial synergies weight matrix")
-
-    # Annotate every cell with its numeric weight (compact 2-decimal format).
-    for i in range(W.shape[0]):      # synergies
-        for j in range(W.shape[1]):  # DoF
-            plt.text(j, i, f"{W[i, j]:.2f}", ha="center", va="center", fontsize=7)
-
-    plt.tight_layout()
-    heatmap_path = os.path.join(plots_dir, "weight_matrix_heatmap.png")
-    plt.savefig(heatmap_path, dpi=150, bbox_inches="tight")
-    print(f"[OK] Saved weight matrix heatmap to: {heatmap_path}")
-    plt.show()
-
-    # -------------------------------------------------------------------------
-    # 6) Per-synergy bar plots (one figure per synergy, K figures total).
-    # -------------------------------------------------------------------------
-    W = np.asarray(model.synergies)   # (K, M)  -- re-bind for clarity
-    K, M = W.shape
-
-    joint_labels = [f"J{j+1}" for j in range(M)]
-
-    for k in range(K):
-        plt.figure(figsize=(10, 3))
-        plt.bar(range(M), W[k], color="tab:purple")
-
-        plt.axhline(0, linewidth=1, color="black")
-        plt.xticks(range(M), joint_labels, rotation=90)
-        plt.ylabel("Weight")
+        plt.yticks(range(W.shape[0]), [f"S{k+1}" for k in range(W.shape[0])])
+        plt.xticks(
+            range(W.shape[1]),
+            [str(i + 1) for i in range(W.shape[1])],
+            rotation=90,
+        )
         plt.xlabel("Joint (DoF)")
-        plt.title(f"Spatial Synergy {k+1}")
+        plt.ylabel("Synergy")
+        plt.title("Spatial synergies weight matrix")
+
+        # Annotate every cell with its numeric weight (compact 2-decimal format).
+        for i in range(W.shape[0]):      # synergies
+            for j in range(W.shape[1]):  # DoF
+                plt.text(j, i, f"{W[i, j]:.2f}", ha="center", va="center", fontsize=7)
 
         plt.tight_layout()
-        bar_path = os.path.join(plots_dir, f"synergy_bar_{k+1:02d}.png")
-        plt.savefig(bar_path, dpi=150, bbox_inches="tight")
+        heatmap_path = os.path.join(plots_dir, "weight_matrix_heatmap.png")
+        plt.savefig(heatmap_path, dpi=150, bbox_inches="tight")
+        print(f"[OK] Saved weight matrix heatmap to: {heatmap_path}")
         plt.show()
-    print(f"[OK] Saved {K} per-synergy bar plots to: {plots_dir}")
 
-    # -------------------------------------------------------------------------
-    # 7) Paper-style joint x synergy contribution grid (single trajectory).
-    # -------------------------------------------------------------------------
-    plot_joint_synergy_contributions_grid(
-        model,
-        activities,
-        traj_idx=int(args.traj_idx),
-        joints=list(range(min(20, W.shape[1]))),
-        synergies=list(range(min(K, 5))),
-        y_mode="per_col",
-        save_path=os.path.join(plots_dir, "joint_synergy_grid.png"),
-    )
+        # 6) Per-synergy bar plots (one figure per synergy, K figures total).
+        W = np.asarray(model.synergies)   # (K, M)  -- re-bind for clarity
+        K, M = W.shape
+
+        joint_labels = [f"J{j+1}" for j in range(M)]
+
+        for k in range(K):
+            plt.figure(figsize=(10, 3))
+            plt.bar(range(M), W[k], color="tab:purple")
+
+            plt.axhline(0, linewidth=1, color="black")
+            plt.xticks(range(M), joint_labels, rotation=90)
+            plt.ylabel("Weight")
+            plt.xlabel("Joint (DoF)")
+            plt.title(f"Spatial Synergy {k+1}")
+
+            plt.tight_layout()
+            bar_path = os.path.join(plots_dir, f"synergy_bar_{k+1:02d}.png")
+            plt.savefig(bar_path, dpi=150, bbox_inches="tight")
+            plt.show()
+        print(f"[OK] Saved {K} per-synergy bar plots to: {plots_dir}")
+
+        # 7) Paper-style joint x synergy contribution grid (single trajectory).
+        plot_joint_synergy_contributions_grid(
+            model,
+            activities,
+            traj_idx=int(args.traj_idx),
+            joints=list(range(min(20, W.shape[1]))),
+            synergies=list(range(min(K, 5))),
+            y_mode="per_col",
+            save_path=os.path.join(plots_dir, "joint_synergy_grid.png"),
+        )
+    else:
+        print("[SKIP] method has no fixed weight matrix "
+              "(weight heatmap / bar plots / contribution grid skipped).")
 
 
 if __name__ == "__main__":
