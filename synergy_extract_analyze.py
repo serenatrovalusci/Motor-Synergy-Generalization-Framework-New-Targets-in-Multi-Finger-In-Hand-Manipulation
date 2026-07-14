@@ -400,6 +400,14 @@ def main():
         default=None,
         help="Output path for the saved reconstruction artefact (when --save-recon).",
     )
+    parser.add_argument(
+        "--plots-dir",
+        type=str,
+        default=None,
+        help="Directory to save all diagnostic plots as PNGs (in addition to "
+             "plt.show(), which is a no-op on headless/remote setups without a "
+             "GUI backend). If None, saved next to the npz in 'synergy_plots/'.",
+    )
 
     parser.add_argument(
         "--traj-idx",
@@ -451,6 +459,11 @@ def main():
 
     N, T, M = data.shape
     print(f"Loaded '{args.array_key}': {data.shape}")
+
+    plots_dir = args.plots_dir
+    if plots_dir is None:
+        plots_dir = os.path.join(os.path.dirname(os.path.abspath(args.npz_path)), "synergy_plots")
+    os.makedirs(plots_dir, exist_ok=True)
 
     # -------------------------------------------------------------------------
     # 2) Fit the chosen-K model used for the bundle and the per-synergy plots.
@@ -543,6 +556,9 @@ def main():
     plt.ylim(0.0, 1.05)
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
+    r2_path = os.path.join(plots_dir, "r2_vs_k.png")
+    plt.savefig(r2_path, dpi=150, bbox_inches="tight")
+    print(f"[OK] Saved R^2-vs-K plot to: {r2_path}")
     plt.show()
 
     # -------------------------------------------------------------------------
@@ -570,6 +586,9 @@ def main():
             plt.text(j, i, f"{W[i, j]:.2f}", ha="center", va="center", fontsize=7)
 
     plt.tight_layout()
+    heatmap_path = os.path.join(plots_dir, "weight_matrix_heatmap.png")
+    plt.savefig(heatmap_path, dpi=150, bbox_inches="tight")
+    print(f"[OK] Saved weight matrix heatmap to: {heatmap_path}")
     plt.show()
 
     # -------------------------------------------------------------------------
@@ -591,7 +610,10 @@ def main():
         plt.title(f"Spatial Synergy {k+1}")
 
         plt.tight_layout()
+        bar_path = os.path.join(plots_dir, f"synergy_bar_{k+1:02d}.png")
+        plt.savefig(bar_path, dpi=150, bbox_inches="tight")
         plt.show()
+    print(f"[OK] Saved {K} per-synergy bar plots to: {plots_dir}")
 
     # -------------------------------------------------------------------------
     # 7) Paper-style joint x synergy contribution grid (single trajectory).
@@ -603,7 +625,7 @@ def main():
         joints=list(range(min(20, W.shape[1]))),
         synergies=list(range(min(K, 5))),
         y_mode="per_col",
-        save_path="joint_synergy_grid.png",
+        save_path=os.path.join(plots_dir, "joint_synergy_grid.png"),
     )
 
 
