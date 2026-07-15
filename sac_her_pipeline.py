@@ -24,7 +24,7 @@ Pipeline at a glance (synergy mode)
 Output layout (under --save-dir)
 ---------------------------------
     best/           best_model.zip + vecnorm_best.pkl   (kept in sync)
-    ckpts/          periodic checkpoints every 50k steps
+    ckpts/          periodic checkpoints every --checkpoint-freq steps (default 500k)
     eval_logs/      EvalCallback npz logs
     tb_logs/        TensorBoard scalars
     args.json       full run configuration
@@ -32,15 +32,15 @@ Output layout (under --save-dir)
 Usage examples
 --------------
   # Synergy training
-  python train_sac_her_synergy.py \\
+  python sac_her_pipeline.py \\
       --task train \\
-      --env-id HandManipulateBlockRotateXYZ_ContinuousTouchSensors-v1 \\
+      --env-id HandManipulateEggRotate_ContinuousTouchSensors-v1 \\
       --synergy-path pca/block_K5 \\
       --save-dir runs/synergy_K5_egg \\
-      --timesteps 2000000
+      --timesteps 3000000
 
   # Full action space (baseline)
-  python train_sac_her_synergy.py \\
+  python sac_her_pipeline.py \\
       --task train \\
       --full-action-space \\
       --env-id HandManipulateEggRotate_ContinuousTouchSensors-v1 \\
@@ -48,16 +48,18 @@ Usage examples
       --timesteps 6000000
 
   # Evaluation
-  python train_sac_her_synergy.py \\
+  python sac_her_pipeline.py \\
       --task eval \\
+      --env-id HandManipulateEggRotate_ContinuousTouchSensors-v1 \\
       --synergy-path pca/block_K5 \\
       --save-dir runs/synergy_K5_egg \\
       --eval-episodes 100
 
   # Trajectory collection (actions only)
-  python train_sac_her_synergy.py \\
+  python sac_her_pipeline.py \\
       --task collect \\
       --full-action-space \\
+      --env-id HandManipulateBlockRotateXYZ_ContinuousTouchSensors-v1 \\
       --save-dir runs/full_action_block \\
       --traj-episodes 200 \\
       --traj-save-path trajectory.npz
@@ -547,7 +549,7 @@ def main():
         "--full-action-space", action="store_true",
         help="Train/evaluate in the native M-dimensional joint space (no synergy).",
     )
-    parser.add_argument("--act-scale", type=float, default=0.5)
+    parser.add_argument("--act-scale", type=float, default=3.0)
     parser.add_argument("--nonnegative-activities", action="store_true")
 
     # --- Bookkeeping --------------------------------------------------------
