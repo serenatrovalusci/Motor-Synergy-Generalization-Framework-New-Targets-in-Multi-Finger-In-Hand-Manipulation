@@ -7,11 +7,7 @@
 #       --out plots/comparison_egg.png
 #
 #   # wandb (pulls eval/success_rate + time/elapsed_sec from every run in a --wandb-group)
-#   python plot.py \
-#       --baseline-wandb-group big_block_synergy_K5 \
-#       --synergy-wandb-group egg_synergy_K5 \
-#       --synergy-label "Synergy (egg)" \
-#       --out plots/comparison.png
+#   python plot.py     --baseline-wandb-group full_smallblock     --synergy-wandb-group smallblock_synergy_K5     --synergy-label "Synergy"     --out plots/new/smallblock_comparison.png 
 
 import argparse
 import os
