@@ -1,3 +1,18 @@
+# Usage examples
+# --------------
+#   # Local run directories (reads eval_logs/evaluations.npz + tb_logs/)
+#   python plot.py \
+#       --baseline-dirs runs/full_action_egg_seed0 runs/full_action_egg_seed1 runs/full_action_egg_seed2 \
+#       --synergy-dirs runs/synergy_K5_egg_seed0 runs/synergy_K5_egg_seed1 runs/synergy_K5_egg_seed2 \
+#       --out plots/comparison_egg.png
+#
+#   # wandb (pulls eval/success_rate + time/elapsed_sec from every run in a --wandb-group)
+#   python plot.py \
+#       --baseline-wandb-group big_block_synergy_K5 \
+#       --synergy-wandb-group egg_synergy_K5 \
+#       --synergy-label "Synergy (egg)" \
+#       --out plots/comparison.png
+
 import argparse
 import os
 import numpy as np
@@ -44,6 +59,76 @@ def align_and_stack(run_dirs: list[str], key: str):
     ], axis=0)
 
     return common_ts, stacked
+
+
+def fetch_wandb_group_runs(project: str, entity: str | None, group: str):
+    """Return every wandb run tagged with ``--wandb-group group`` in project/entity."""
+    import wandb
+
+    api = wandb.Api()
+    entity = entity or api.default_entity
+    path = f"{entity}/{project}"
+    runs = list(api.runs(path, filters={"group": group}))
+    if not runs:
+        raise ValueError(f"No wandb runs found for group='{group}' in '{path}'.")
+    return runs
+
+
+def align_and_stack_wandb(runs, metric_key: str = "eval/success_rate"):
+    """
+    wandb equivalent of :func:`align_and_stack`. Pulls ``metric_key`` vs
+    ``_step`` from each run's full (unsampled) history and interpolates onto
+    a common timestep grid, exactly like the local-npz path.
+
+    Unlike the local ``"successes"`` array (raw per-episode 0/1, averaged
+    here via ``vals.mean(axis=1)``), ``eval/success_rate`` is a scalar SB3
+    already logs once per eval via ``EvalCallback`` -- no extra averaging
+    needed, wandb's ``sync_tensorboard=True`` mirrors it from TensorBoard.
+    """
+    all_ts, all_vals = [], []
+    for run in runs:
+        rows = [r for r in run.scan_history(keys=["_step", metric_key])
+                 if r.get(metric_key) is not None]
+        if not rows:
+            raise ValueError(f"Run '{run.name}' has no logged '{metric_key}'.")
+        ts   = np.array([r["_step"] for r in rows], dtype=np.float64)
+        vals = np.array([r[metric_key] for r in rows], dtype=np.float64)
+        order = np.argsort(ts)
+        all_ts.append(ts[order])
+        all_vals.append(vals[order])
+
+    min_len   = min(len(ts) for ts in all_ts)
+    common_ts = all_ts[np.argmin([len(t) for t in all_ts])][:min_len]
+
+    stacked = np.stack([
+        np.interp(common_ts, ts, vals)
+        for ts, vals in zip(all_ts, all_vals)
+    ], axis=0)
+
+    return common_ts, stacked
+
+
+def wandb_elapsed(run) -> tuple[np.ndarray, np.ndarray]:
+    """wandb equivalent of :func:`read_tb_elapsed`: (steps, elapsed_seconds)."""
+    rows = [r for r in run.scan_history(keys=["_step", "time/elapsed_sec"])
+             if r.get("time/elapsed_sec") is not None]
+    if not rows:
+        raise ValueError(f"Run '{run.name}' has no logged 'time/elapsed_sec'.")
+    steps   = np.array([r["_step"] for r in rows], dtype=np.float64)
+    elapsed = np.array([r["time/elapsed_sec"] for r in rows], dtype=np.float64)
+    order = np.argsort(steps)
+    return steps[order], elapsed[order]
+
+
+def wall_clock_to_threshold_wandb(runs, crossing_timesteps: np.ndarray):
+    """wandb equivalent of :func:`wall_clock_to_threshold`."""
+    result = []
+    for run, ts_cross in zip(runs, crossing_timesteps):
+        steps, elapsed = wandb_elapsed(run)
+        wc = float(np.interp(ts_cross, steps, elapsed,
+                             left=elapsed[0], right=elapsed[-1]))
+        result.append(wc)
+    return np.array(result)
 
 
 def read_tb_elapsed(run_dir: str) -> tuple[np.ndarray, np.ndarray]:
@@ -225,10 +310,25 @@ def plot_bar_pair(ax, values_base, values_syn, color_base, color_syn,
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--baseline-dirs", nargs=3, required=True,
-                        metavar="DIR", help="3 baseline run directories")
-    parser.add_argument("--synergy-dirs",  nargs=3, required=True,
-                        metavar="DIR", help="3 synergy run directories")
+    parser.add_argument("--baseline-dirs", nargs=3, default=None,
+                        metavar="DIR", help="3 local baseline run directories "
+                        "(reads eval_logs/evaluations.npz + tb_logs/). "
+                        "Mutually exclusive with --baseline-wandb-group.")
+    parser.add_argument("--synergy-dirs",  nargs=3, default=None,
+                        metavar="DIR", help="3 local synergy run directories. "
+                        "Mutually exclusive with --synergy-wandb-group.")
+    parser.add_argument("--baseline-wandb-group", type=str, default=None,
+                        help="Pull baseline data from every wandb run tagged with this "
+                             "--wandb-group (as set in sac_her_pipeline.py), instead of "
+                             "reading local run directories.")
+    parser.add_argument("--synergy-wandb-group", type=str, default=None,
+                        help="Pull synergy data from wandb instead of local dirs.")
+    parser.add_argument("--wandb-project", type=str, default="motor-synergy-generalization")
+    parser.add_argument("--wandb-entity", type=str, default=None,
+                        help="Defaults to your wandb account's default entity.")
+    parser.add_argument("--wandb-metric", type=str, default="eval/success_rate",
+                        help="Scalar key logged by SB3's EvalCallback and mirrored to "
+                             "wandb via sync_tensorboard=True.")
     parser.add_argument("--synergy-label", type=str, default="Synergy")
     parser.add_argument("--threshold",     type=float, default=SUCCESS_THRESHOLD,
                         help="Success threshold for efficiency metrics (default: 0.80)")
@@ -236,6 +336,11 @@ def main():
                         help="Base path. Two files are written: "
                              "<base>_success<ext> and <base>_efficiency<ext>.")
     args = parser.parse_args()
+
+    if bool(args.baseline_dirs) == bool(args.baseline_wandb_group):
+        parser.error("Provide exactly one of --baseline-dirs or --baseline-wandb-group.")
+    if bool(args.synergy_dirs) == bool(args.synergy_wandb_group):
+        parser.error("Provide exactly one of --synergy-dirs or --synergy-wandb-group.")
 
     out_dir = os.path.dirname(args.out)
     if out_dir:
@@ -251,9 +356,25 @@ def main():
     LABEL_BASE = "Baseline (full action space)"
     LABEL_SYN  = args.synergy_label
 
+    # ── Resolve data source (local dirs vs wandb group) per side ─────────
+    baseline_runs = (
+        fetch_wandb_group_runs(args.wandb_project, args.wandb_entity, args.baseline_wandb_group)
+        if args.baseline_wandb_group else None
+    )
+    synergy_runs = (
+        fetch_wandb_group_runs(args.wandb_project, args.wandb_entity, args.synergy_wandb_group)
+        if args.synergy_wandb_group else None
+    )
+
     # ── 1. Success rate (learning curves) ────────────────────────────────
-    ts_base, succ_base = align_and_stack(args.baseline_dirs, "successes")
-    ts_syn,  succ_syn  = align_and_stack(args.synergy_dirs,  "successes")
+    ts_base, succ_base = (
+        align_and_stack_wandb(baseline_runs, args.wandb_metric) if baseline_runs
+        else align_and_stack(args.baseline_dirs, "successes")
+    )
+    ts_syn, succ_syn = (
+        align_and_stack_wandb(synergy_runs, args.wandb_metric) if synergy_runs
+        else align_and_stack(args.synergy_dirs, "successes")
+    )
 
     # ── Resolve effective threshold ───────────────────────────────────────
     # If neither group ever reaches the absolute threshold (args.threshold),
@@ -291,8 +412,14 @@ def main():
     ttt_base = time_to_threshold(ts_base, succ_base, effective_threshold)
     ttt_syn  = time_to_threshold(ts_syn,  succ_syn,  effective_threshold)
 
-    wc_base  = wall_clock_to_threshold(args.baseline_dirs, ttt_base)
-    wc_syn   = wall_clock_to_threshold(args.synergy_dirs,  ttt_syn)
+    wc_base = (
+        wall_clock_to_threshold_wandb(baseline_runs, ttt_base) if baseline_runs
+        else wall_clock_to_threshold(args.baseline_dirs, ttt_base)
+    )
+    wc_syn = (
+        wall_clock_to_threshold_wandb(synergy_runs, ttt_syn) if synergy_runs
+        else wall_clock_to_threshold(args.synergy_dirs, ttt_syn)
+    )
 
     # ── Debug: print every value going into the bar charts ───────────────
     def fmt_h(s):
