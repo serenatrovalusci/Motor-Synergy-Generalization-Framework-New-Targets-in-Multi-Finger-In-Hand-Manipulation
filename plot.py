@@ -73,8 +73,14 @@ def fetch_wandb_group_runs(project: str, entity: str | None, group: str):
 def align_and_stack_wandb(runs, metric_key: str = "eval/success_rate"):
     """
     wandb equivalent of :func:`align_and_stack`. Pulls ``metric_key`` vs
-    ``_step`` from each run's full (unsampled) history and interpolates onto
-    a common timestep grid, exactly like the local-npz path.
+    ``global_step`` from each run's full (unsampled) history and interpolates
+    onto a common timestep grid, exactly like the local-npz path.
+
+    Uses the ``global_step`` column rather than wandb's own ``_step`` --
+    under ``sync_tensorboard=True``, ``_step`` is wandb's internal per-log-call
+    counter (small sequential ints), NOT the original TensorBoard/SB3
+    ``num_timesteps`` value. The real env-timestep count is preserved
+    separately as ``global_step`` by the tensorboard sync.
 
     Unlike the local ``"successes"`` array (raw per-episode 0/1, averaged
     here via ``vals.mean(axis=1)``), ``eval/success_rate`` is a scalar SB3
@@ -83,11 +89,11 @@ def align_and_stack_wandb(runs, metric_key: str = "eval/success_rate"):
     """
     all_ts, all_vals = [], []
     for run in runs:
-        rows = [r for r in run.scan_history(keys=["_step", metric_key])
+        rows = [r for r in run.scan_history(keys=["global_step", metric_key])
                  if r.get(metric_key) is not None]
         if not rows:
             raise ValueError(f"Run '{run.name}' has no logged '{metric_key}'.")
-        ts   = np.array([r["_step"] for r in rows], dtype=np.float64)
+        ts   = np.array([r["global_step"] for r in rows], dtype=np.float64)
         vals = np.array([r[metric_key] for r in rows], dtype=np.float64)
         order = np.argsort(ts)
         all_ts.append(ts[order])
@@ -105,12 +111,16 @@ def align_and_stack_wandb(runs, metric_key: str = "eval/success_rate"):
 
 
 def wandb_elapsed(run) -> tuple[np.ndarray, np.ndarray]:
-    """wandb equivalent of :func:`read_tb_elapsed`: (steps, elapsed_seconds)."""
-    rows = [r for r in run.scan_history(keys=["_step", "time/elapsed_sec"])
+    """wandb equivalent of :func:`read_tb_elapsed`: (steps, elapsed_seconds).
+
+    See :func:`align_and_stack_wandb` docstring for why ``global_step`` is
+    used instead of wandb's own ``_step``.
+    """
+    rows = [r for r in run.scan_history(keys=["global_step", "time/elapsed_sec"])
              if r.get("time/elapsed_sec") is not None]
     if not rows:
         raise ValueError(f"Run '{run.name}' has no logged 'time/elapsed_sec'.")
-    steps   = np.array([r["_step"] for r in rows], dtype=np.float64)
+    steps   = np.array([r["global_step"] for r in rows], dtype=np.float64)
     elapsed = np.array([r["time/elapsed_sec"] for r in rows], dtype=np.float64)
     order = np.argsort(steps)
     return steps[order], elapsed[order]
