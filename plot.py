@@ -25,7 +25,7 @@ import matplotlib.ticker as mticker
 # ─────────────────────────────────────────────
 
 SUCCESS_THRESHOLD       = 0.80   # §Metrics: "prescribed success threshold, typically 80 %"
-RELATIVE_THRESHOLD_FRAC = 0.60   # fraction of the peak success rate used when absolute is unreachable
+RELATIVE_THRESHOLD_FRAC = 0.80   # fraction of the peak success rate used when absolute is unreachable
 N_EVAL_EPISODES         = 200    # §Metrics: "estimated over 200 held-out episodes"
 
 
@@ -331,7 +331,12 @@ def main():
                              "wandb via sync_tensorboard=True.")
     parser.add_argument("--synergy-label", type=str, default="Synergy")
     parser.add_argument("--threshold",     type=float, default=SUCCESS_THRESHOLD,
-                        help="Success threshold for efficiency metrics (default: 0.80)")
+                        help="Absolute success threshold for efficiency metrics, used "
+                             "only when both curves fully saturate to 100%% (default: 0.80)")
+    parser.add_argument("--relative-threshold-frac", type=float, default=RELATIVE_THRESHOLD_FRAC,
+                        help="Fallback threshold as a fraction of peak mean success rate, "
+                             "used when the curves DON'T fully saturate to 100%% "
+                             "(default: 0.80, i.e. 80%% of peak)")
     parser.add_argument("--out", type=str, default="plots/comparison.png",
                         help="Base path. Two files are written: "
                              "<base>_success<ext> and <base>_efficiency<ext>.")
@@ -396,15 +401,15 @@ def main():
         threshold_label     = f"{int(args.threshold * 100)}%"
         threshold_note      = ""
     else:
-        effective_threshold = RELATIVE_THRESHOLD_FRAC * float(peak)
-        threshold_label     = f"{RELATIVE_THRESHOLD_FRAC*100:.0f}% of peak ({peak*100:.1f}%)"
+        effective_threshold = args.relative_threshold_frac * float(peak)
+        threshold_label     = f"{args.relative_threshold_frac*100:.0f}% of peak ({peak*100:.1f}%)"
         threshold_note      = (
             f"  [peak success {peak*100:.1f}% < 100% — "
             f"using relative threshold = {effective_threshold*100:.1f}%]"
         )
         print(f"INFO: peak mean success = {peak*100:.2f}% (< 100%).")
         print(f"      Using relative threshold: {effective_threshold*100:.2f}% "
-              f"(= {RELATIVE_THRESHOLD_FRAC*100:.0f}% of peak)")
+              f"(= {args.relative_threshold_frac*100:.0f}% of peak)")
 
     # ── 2 & 3. Sample + wall-clock efficiency ────────────────────────────
     # Both use the same aligned stacked arrays as the success-rate plot,
