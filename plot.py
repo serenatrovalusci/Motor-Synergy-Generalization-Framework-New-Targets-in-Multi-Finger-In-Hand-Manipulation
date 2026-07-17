@@ -356,6 +356,11 @@ def main():
                         help="npz filename inside <run_dir>/eval_logs/ (local dirs only). "
                              "Use 'evaluations_anytime.npz' (from eval_checkpoints.py) "
                              "for the any-time success definition.")
+    parser.add_argument("--show-threshold", action="store_true",
+                        help="Draw the dashed threshold line in the success-rate "
+                             "figure. Off by default: the threshold still drives the "
+                             "efficiency figures, where its value is stated in the "
+                             "y-labels.")
     args = parser.parse_args()
 
     NPZ_NAME = args.npz_name
@@ -467,9 +472,10 @@ def main():
 
     plot_band(ax, ts_base, succ_base, COLOR_BASE, LABEL_BASE)
     plot_band(ax, ts_syn,  succ_syn,  COLOR_SYN,  LABEL_SYN)
-    ax.axhline(effective_threshold, color="gray", linewidth=1,
-               linestyle="--", alpha=0.6,
-               label=f"Threshold ({threshold_label})")
+    if args.show_threshold:
+        ax.axhline(effective_threshold, color="gray", linewidth=1,
+                   linestyle="--", alpha=0.6,
+                   label=f"Threshold ({threshold_label})")
     #ax.set_title("Success rate")
     ax.set_xlabel("Timesteps")
     ax.set_ylabel(f"Success rate  (mean ± std)")
