@@ -267,10 +267,11 @@ def time_to_threshold(ts: np.ndarray, stacked: np.ndarray,
 
 
 def plot_band(ax, ts, stacked, color, label):
-    """Plot mean ± 1 std band."""
+    """Plot mean ± 1 std band, with markers on the measured points."""
     mean = stacked.mean(axis=0)
     std  = stacked.std(axis=0)
-    ax.plot(ts, mean, color=color, linewidth=2, label=label)
+    ax.plot(ts, mean, color=color, linewidth=2, label=label,
+            marker="o", markersize=4)
     ax.fill_between(ts, mean - std, mean + std, color=color, alpha=0.2)
 
 
