@@ -1,55 +1,37 @@
 {
   "objects": [
     {
-      "name": "Big block",
-      "photo": "figs/photos/big_block.png",
+      "name": "Cylinder",
+      "photo": "objects_shots/cylinder.png",
       "with_sensors": {
-        "baseline_wandb_group": "big_block_full",
-        "synergy_wandb_group": "big_block_synergy_K5",
+        "baseline_wandb_group": "cylinder_full",
+        "synergy_wandb_group": "cylinder_synergy_K5",
         "baseline_dirs": [
-          "runs/big_block_full_seed0",
-          "runs/big_block_full_seed1",
-          "runs/big_block_full_seed2"
+          "runs/sensor/cylinder_full_seed0",
+          "runs/sensor/cylinder_full_seed1",
+          "runs/sensor/cylinder_full_seed2"
         ],
         "synergy_dirs": [
-          "runs/big_block_synergy_K5_seed0",
-          "runs/big_block_synergy_K5_seed1",
-          "runs/big_block_synergy_K5_seed2"
+          "runs/sensor/cylinder_synergy_K5_seed0",
+          "runs/sensor/cylinder_synergy_K5_seed1",
+          "runs/sensor/cylinder_synergy_K5_seed2"
         ]
       },
       "no_sensors": {
-        "baseline_wandb_group": "big_block_nosensor_full",
-        "synergy_wandb_group": "big_block_nosensor_synergy_K5",
+        "baseline_wandb_group": "cylinder_nosensor_full",
+        "synergy_wandb_group": "cylinder_nosensor_synergy_K5",
         "baseline_dirs": [
-          "runs/big_block_nosensor_full_seed0",
-          "runs/big_block_nosensor_full_seed1",
-          "runs/big_block_nosensor_full_seed2"
+          "runs/no_sensor/cylinder_nosensor_full_seed0",
+          "runs/no_sensor/cylinder_nosensor_full_seed1",
+          "runs/no_sensor/cylinder_nosensor_full_seed2"
         ],
         "synergy_dirs": [
-          "runs/big_block_nosensor_synergy_K5_seed0",
-          "runs/big_block_nosensor_synergy_K5_seed1",
-          "runs/big_block_nosensor_synergy_K5_seed2"
+          "runs/no_sensor/cylinder_nosensor_synergy_K5_seed0",
+          "runs/no_sensor/cylinder_nosensor_synergy_K5_seed1",
+          "runs/no_sensor/cylinder_nosensor_synergy_K5_seed2"
         ]
       }
-    },
-    {
-      "name": "Sphere",
-      "photo": "figs/photos/sphere.png",
-      "with_sensors": {
-        "baseline_wandb_group": "sphere_full",
-        "synergy_wandb_group": "sphere_synergy_K5",
-        "baseline_dirs": [
-          "runs/sphere_full_seed0",
-          "runs/sphere_full_seed1",
-          "runs/sphere_full_seed2"
-        ],
-        "synergy_dirs": [
-          "runs/sphere_synergy_K5_seed0",
-          "runs/sphere_synergy_K5_seed1",
-          "runs/sphere_synergy_K5_seed2"
-        ]
-      },
-      "no_sensors": null
     }
+   
   ]
 }
