@@ -24,10 +24,15 @@ SUCCESS_THRESHOLD       = 0.80   # §Metrics: "prescribed success threshold, typ
 RELATIVE_THRESHOLD_FRAC = 0.80   # fraction of the peak success rate used when absolute is unreachable
 N_EVAL_EPISODES         = 200    # §Metrics: "estimated over 200 held-out episodes"
 
+# Which npz file to read inside <run_dir>/eval_logs/. Overridden by --npz-name;
+# "evaluations_anytime.npz" (written by eval_checkpoints.py) selects the
+# any-time success definition instead of EvalCallback's end-of-episode one.
+NPZ_NAME = "evaluations.npz"
+
 
 def load_npz(run_dir: str):
-    """Load evaluations.npz from a run directory."""
-    path = os.path.join(run_dir, "eval_logs", "evaluations.npz")
+    """Load the eval npz (see NPZ_NAME) from a run directory."""
+    path = os.path.join(run_dir, "eval_logs", NPZ_NAME)
     if not os.path.exists(path):
         raise FileNotFoundError(f"Could not find: {path}")
     return np.load(path)
@@ -315,6 +320,7 @@ def plot_bar_pair(ax, values_base, values_syn, color_base, color_syn,
 # ─────────────────────────────────────────────
 
 def main():
+    global NPZ_NAME
     parser = argparse.ArgumentParser()
     parser.add_argument("--baseline-dirs", nargs=3, default=None,
                         metavar="DIR", help="3 local baseline run directories "
@@ -346,7 +352,13 @@ def main():
     parser.add_argument("--out", type=str, default="plots/comparison.png",
                         help="Base path. Two files are written: "
                              "<base>_success<ext> and <base>_efficiency<ext>.")
+    parser.add_argument("--npz-name", type=str, default=NPZ_NAME,
+                        help="npz filename inside <run_dir>/eval_logs/ (local dirs only). "
+                             "Use 'evaluations_anytime.npz' (from eval_checkpoints.py) "
+                             "for the any-time success definition.")
     args = parser.parse_args()
+
+    NPZ_NAME = args.npz_name
 
     if bool(args.baseline_dirs) == bool(args.baseline_wandb_group):
         parser.error("Provide exactly one of --baseline-dirs or --baseline-wandb-group.")
