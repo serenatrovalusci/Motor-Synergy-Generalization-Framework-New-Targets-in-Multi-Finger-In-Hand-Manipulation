@@ -23,7 +23,7 @@
         "baseline_dirs": [
           "runs/no_sensor/egg_nosensor_full_seed0",
           "runs/no_sensor/egg_nosensor_full_seed1",
-          "runs/no_sensor/cylinder_nosensor_full_seed2"
+          "runs/no_sensor/egg_nosensor_full_seed2"
         ],
         "synergy_dirs": [
           "runs/no_sensor/egg_nosensor_synergy_K5_seed0",
