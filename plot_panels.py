@@ -143,8 +143,16 @@ def print_sustained_efficiency(label: str, curves, relative_threshold_frac: floa
     fmt_group("synergy", ttt_syn, wc_syn, syn_all_crossed)
 
 
-def draw_cell(ax, curves, show_threshold: bool, relative_threshold_frac: float):
-    """Draw one success-rate cell; returns (handles, labels) for the shared legend, or None."""
+def draw_cell(ax, curves, metric: str, show_threshold: bool, relative_threshold_frac: float):
+    """
+    Draw one success-rate cell; returns (handles, labels) for the shared
+    legend, or None.
+
+    The threshold line is only ever drawn for "sustained" cells -- reach is
+    reported as a purely descriptive metric (no threshold-crossing analysis
+    is computed for it, see print_sustained_efficiency), so drawing the line
+    there would visually imply an analysis that doesn't exist.
+    """
     if curves is None:
         ax.text(0.5, 0.5, "no data", ha="center", va="center",
                 fontsize=9, color="gray", transform=ax.transAxes)
@@ -158,7 +166,7 @@ def draw_cell(ax, curves, show_threshold: bool, relative_threshold_frac: float):
     plot_lib.plot_band(ax, ts_base, succ_base, COLOR_BASE, LABEL_BASE)
     plot_lib.plot_band(ax, ts_syn, succ_syn, COLOR_SYN, LABEL_SYN)
 
-    if show_threshold:
+    if show_threshold and metric == "sustained":
         peak = max(succ_base.mean(axis=0).max(), succ_syn.mean(axis=0).max())
         threshold = relative_threshold_frac * float(peak) if peak < 1.0 else 0.80
         ax.axhline(threshold, color="gray", linewidth=1, linestyle="--", alpha=0.6)
@@ -185,7 +193,7 @@ def render_object_panel(obj_cfg: dict, args):
     for ci, (sensor_key, metric, col_title) in enumerate(COLUMNS):
         ax = axes[1 + ci]
         curves = load_curve(sensor_key, metric, obj_cfg, args)
-        result = draw_cell(ax, curves, args.show_threshold, args.relative_threshold_frac)
+        result = draw_cell(ax, curves, metric, args.show_threshold, args.relative_threshold_frac)
         if result is not None and legend_handles is None:
             legend_handles, legend_labels = result
         ax.set_title(col_title, fontsize=8.5)
