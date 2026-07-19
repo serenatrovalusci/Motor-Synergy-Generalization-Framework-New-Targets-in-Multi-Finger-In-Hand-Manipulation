@@ -1,0 +1,693 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%2345678901234567890123456789012345678901234567890123456789012345678901234567890
+%        1         2         3         4         5         6         7         8
+
+\documentclass[letterpaper, 10 pt, conference]{ieeeconf}  % Comment this line out if you need a4paper
+
+%\documentclass[a4paper, 10pt, conference]{ieeeconf}      % Use this line for a4 paper
+
+\IEEEoverridecommandlockouts                              % This command is only needed if 
+                                                          % you want to use the \thanks command
+
+\overrideIEEEmargins                                      % Needed to meet printer requirements.
+
+%In case you encounter the following error:
+%Error 1010 The PDF file may be corrupt (unable to open PDF file) OR
+%Error 1000 An error occurred while parsing a contents stream. Unable to analyze the PDF file.
+%This is a known problem with pdfLaTeX conversion filter. The file cannot be opened with acrobat reader
+%Please use one of the alternatives below to circumvent this error by uncommenting one or the other
+%\pdfobjcompresslevel=0
+%\pdfminorversion=4
+
+% See the \addtolength command later in the file to balance the column lengths
+% on the last page of the document
+
+% The following packages can be found on http:\\www.ctan.org
+\usepackage{graphics} % for pdf, bitmapped graphics files
+\usepackage{epsfig} % for postscript graphics files
+\usepackage{mathptmx} % assumes new font selection scheme installed
+\usepackage{times} % assumes new font selection scheme installed
+\usepackage{amsmath} % assumes amsmath package installed
+\usepackage{amssymb}  % assumes amsmath package installed
+\usepackage{subcaption}
+
+\title{\LARGE \bf
+
+Single Source Synergy-Constrained Policy Learning for Multi-finger In-Hand Manipulation Across Novel Objects with Tactile Sense
+}
+
+
+%\author{Serena Trovalusci$^{1}$ and Mitsuhiro Hayashibe$^{2}$% <-this % stops a space
+%\thanks{*This work was supported by Sapienza University of Rome and Tohoku University}% <-this % stops a space
+%\thanks{$^{1}$S. Trovalusci was with the Department of Computer, Control, and 
+        %Management Engineering, Sapienza University of Rome, 00185 Rome, Italy.
+        %{\tt\small trovalusciserena@gmail.com}}%
+%\thanks{$^{2}$M. Hayashibe is with the Department of Robotics, Graduate School 
+        %of Engineering, Tohoku University, Sendai 980-8579, Japan.
+        %{\tt\small mitsuhiro.hayashibe.e6@tohoku.ac.jp}}%
+
+
+
+\begin{document}
+
+
+
+\maketitle
+\thispagestyle{empty}
+\pagestyle{empty}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{abstract}
+        % Dexterous in-hand manipulation with anthropomorphic robotic hands remains 
+        % an open challenge in robotics, largely due to the sample inefficiency of 
+        % reinforcement learning in high-dimensional continuous action spaces. 
+        % Inspired by the motor synergy hypothesis in neuroscience, we propose the 
+        % Motor Synergy Generalization Framework, a three-stage pipeline in which 
+        % spatial synergies are extracted offline via Principal Component Analysis 
+        % from the joint-action trajectories of a converged full-DoF policy on a 
+        % source task, and reused as a fixed low-dimensional action decoder for 
+        % training new agents on novel target tasks. We evaluate the framework on 
+        % five object reorientation tasks with substantially different geometries 
+        % on the Shadow Dexterous Hand in MuJoCo, comparing a synergy-constrained 
+        % agent operating in a 5-dimensional latent space against a full-action-space 
+        % baseline in the native 20-dimensional joint space. The synergy-constrained 
+        % agent consistently reaches comparable or higher success rates in fewer 
+        % environment timesteps and less wall-clock training time across all five 
+        % objects, with speedups ranging from $1.5\times$ on the large cube to 
+        % $6\times$ on the sphere, demonstrating that a synergy basis extracted from 
+        % a single source task acts as a geometry-agnostic motor prior for dexterous 
+        % manipulation.
+Multi-finger dexterous in-hand manipulation remains a grand challenge in robotics due to high-dimensional action spaces and complex contact dynamics. While Deep Reinforcement Learning (DRL) offers a viable data-driven solution, its practical application is severely bottlenecked by extreme sample inefficiency during random exploration. Inspired by biological motor synergies, this paper proposes a novel three-stage pipeline that extracts spatial coordination patterns from a single source manipulation task to accelerate learning across a wide range of novel object geometries. First, a full-DoF Soft Actor-Critic (SAC) agent combined with Hindsight Experience Replay (HER) is trained on a standard cube reorientation task. Second, spatial synergies are extracted offline via Principal Component Analysis (PCA) from the converged policy's joint-action trajectories. Third, the resulting 5-dimensional synergy basis is frozen and reused identically as a low-dimensional action decoder to constrain policy learning on novel target tasks. We evaluate our approach on five target objects with substantially different shapes: a small cube, a large cube, an egg, a cylinder, and a sphere. Simulation experiments on the 24-DoF Shadow Hand demonstrate that the synergy-constrained agent significantly outperforms the full-DoF baseline across all environments, achieving up to an 83\% reduction in sampling duration and a 6x wall-clock training speedup on the spherical geometry. Our findings demonstrate that a low-dimensional kinematic synergy basis extracted from a single source object can act as a geometry-agnostic motor prior capable of accelerating dexterous manipulation for unseen geometries. 
+\end{abstract}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{INTRODUCTION}
+
+\begin{figure*}[h]
+        \centering
+        \begin{subfigure}[b]{0.18\textwidth}
+            \includegraphics[width=\textwidth]{figures/1.png}
+            \caption{}
+        \end{subfigure}
+        \hfill
+        \begin{subfigure}[b]{0.18\textwidth}
+            \includegraphics[width=\textwidth]{figures/2.png}
+            \caption{}
+        \end{subfigure}
+        \hfill
+        \begin{subfigure}[b]{0.18\textwidth}
+            \includegraphics[width=\textwidth]{figures/3.png}
+            \caption{}
+        \end{subfigure}
+        \hfill
+        \begin{subfigure}[b]{0.18\textwidth}
+            \includegraphics[width=\textwidth]{figures/4.png}
+            \caption{}
+        \end{subfigure}
+        \hfill
+        \begin{subfigure}[b]{0.18\textwidth}
+            \includegraphics[width=\textwidth]{figures/5.png}
+            \caption{}
+        \end{subfigure}
+        \caption{Time-lapse sequence of the source task: goal-conditioned in-hand reorientation of a standard cube using the 20-DoF hand. The policy dynamically manipulates the object from its initial configuration (a), through coordinated finger-gaiting transitions (b–d), to align with the target configuration (e). 
+        Tactile readings are distributed across the hand surface. }
+        \label{fig:cube_sequence}
+\end{figure*}
+
+In-hand manipulation is the ability to reorient and reposition an object within 
+the hand without setting it down or using the other hand. It is one of the most 
+fundamental yet complex motor capabilities in humans, as it requires the 
+coordinated motion of fingers and contact forces, with sensory feedback. Current industrial and medical robotic hands already achieve remarkable precision in structured and repetitive tasks. The next frontier in robotics is dexterous in-hand manipulation in unstructured environments: the ability to    manipulate arbitrary objects with the kind of fluid adaptability that humans exercise effortlessly every day. Performing this with anthropomorphic robotic hands remains one of the most open and challenging problems in robotics \cite{c1, c20}.
+
+The intricate architecture that characterizes the human hand with its bones, muscles, and nerves makes in-hand manipulation tasks highly redundant. Previous studies have revealed that the Central Nervous System (CNS) does not control every single Degree of Freedom (DoF) independently; instead, movements are generated by a small number of functional modules, called \textit{motor synergies} \cite{c2, c23}. A relevant feature of these synergies is their reusability across tasks, which allows the CNS to maintain a dictionary of reusable coordination primitives and learn new behaviours by re-using and combining them \cite{c3,c4}. 
+
+In robotics, rigid anthropomorphic hands such as the Shadow Dexterous Hand involve up to 
+24 DoF, of which 20 are independently actuated. This makes 
+model-based control extremely challenging due to 
+high-dimensional action spaces and non-linear contact dynamics. Data-driven approaches, such as DRL, have shown promising results in recent years. Rather 
+than requiring an explicit model of the environment or an expensive dataset of 
+expert demonstrations \cite{c23}, DRL allows the agent to learn optimal policies directly 
+from trial-and-error interactions with the environment, guided only by a reward 
+signal \cite{c6}. However, random exploration in high-dimensional continuous 
+action spaces is extremely slow, and training requires enormous numbers of 
+environment interactions. This sample inefficiency remains the central bottleneck 
+limiting the practical applicability of DRL to dexterous in-hand manipulation \cite{c7}. Computationally, seeking motor synergy combinations can be seen as a 
+dimensionality reduction technique, which allows to reduce the complexity 
+of the control problem and enables the rapid acquisition of complex motor 
+skills \cite{c5}, provided the resulting low-dimensional controller is 
+designed to exploit the natural dynamics of the system being 
+controlled \cite{c22}.
+
+
+
+Inspired by the Synergistic Action Representation (SAR) of Berg et al.~\cite{c9}, 
+which showed that a muscle synergy basis distilled from multiple manipulation 
+tasks transfers zero-shot to a hundred novel objects, by
+the motor synergy generalization framework~\cite{c8}, which demonstrated that arm 
+synergies extracted from DRL policies trained on multiple reaching targets must 
+be combined to generalize to entirely new targets unreachable by any single 
+repertoire, and by the finding of Fukunishi et al.~\cite{c19} that the 
+generalization capacity of a synergy basis is fundamentally tied to the 
+biomechanical context in which it was extracted, this paper investigates whether 
+motor synergies extracted from a single source in-hand manipulation task can 
+accelerate reinforcement learning on a set of novel target tasks 
+involving objects with substantially different geometries.
+We propose a three-stage pipeline in which a full-DoF 
+Soft Actor-Critic (SAC) agent is first trained on a source task (Stage~A), spatial 
+synergies are then extracted offline via Principal Component Analysis (PCA) from 
+the joint-action trajectories of the converged policy (Stage~B), and the resulting 
+synergy basis is finally used as a fixed low-dimensional action decoder for 
+training new DRL agents on target tasks (Stage~C). The specific contributions of 
+this work are as follows:
+\begin{itemize}
+    \item We propose a three-stage 
+    pipeline that extracts spatial synergies from a single source policy and 
+    reuses them as a fixed action decoder for novel target tasks on the Shadow 
+    Dexterous Hand.
+    \item We demonstrate that constraining the action space to a 5-dimensional 
+    synergy subspace extracted from cube manipulation accelerates learning on five 
+    target tasks spanning a wide range of object geometries, in terms of both 
+    sample efficiency and wall-clock training time.
+    \item We show that the synergy advantage is consistent across all evaluated 
+    objects despite the synergy basis having been extracted from a single source 
+    task with a qualitatively different geometry from most of the targets.
+\end{itemize}
+
+\section{RELATED WORK}
+
+The neuroscientific observation that the human hand operates through a 
+low-dimensional set of coordinated joint patterns was first formalised in 
+a robotic context by Santello, Flanders and Soechting~\cite{c3}, who showed 
+that the first two principal components of hand posture data account for 
+more than 80\% of the variance across a wide variety of grasping tasks, 
+suggesting that a small number of coordination patterns underlies the full 
+repertoire of human grasping. Todorov and Ghahramani~\cite{c21} similarly analyzed postural synergies extracted via PCA during complex manipulation tasks, extending this line of work beyond simple grasping. Ciocarlie and Allen~\cite{c10} 
+exploited this result for autonomous grasp planning, reducing an otherwise 
+high-dimensional search in configuration space to a two-dimensional synergy 
+plane with negligible loss in grasp quality. Bicchi and collaborators 
+extended the idea to mechanical design through the theory of soft synergies 
+and synergy-based underactuation~\cite{c11, c12}, yielding the Pisa/IIT SoftHand, 
+a single-motor hand capable of grasping a wide variety of objects by virtue 
+of its mechanically realised first synergy.
+
+Chai~\cite{c13} were the first to show that high-performing 
+deep RL policies spontaneously develop motor synergy structures, and that 
+the degree of synergy structure correlates with task performance. It is extended to full-dimensional arm manipulation~\cite{c14}, 
+confirming that synergy emergence is a robust phenomenon in high-dimensional 
+continuous action spaces and that it can be exploited to improve learning 
+efficiency. The work directly related to the present paper is that of Kutsuzawa~\cite{c8}, who extracted spatio-temporal synergies from PPO policies 
+via NMF and demonstrated that combining synergy repertoires from two 
+single-plane reaching policies generalizes to entirely new planes that 
+neither repertoire could reach alone. Our work inherits this core insight 
+and extends it to the harder setting of multi-finger in-hand manipulation 
+with sparse rewards, replacing NMF with PCA and PPO with SAC combined with 
+HER. At the muscle level, Berg, Caggiano and Kumar~\cite{c9} developed the 
+Synergistic Action Representation (SAR), obtained by composing ICA and PCA 
+on muscle activations produced by a play-phase policy on simple tasks. The 
+resulting basis generalizes zero-shot to in-hand reorientation of a hundred 
+novel objects, without any additional training on the target tasks. In a 
+smaller-scale, single-source experiment, Berg et al. also extract a 
+\emph{kinematic} synergy basis directly on the 20-DoF Shadow Dexterous Hand 
+used in this work, from a policy trained on a single object, an egg, and 
+use it to accelerate training on two 
+unseen geometries: a capsule and a cylinder. Our work extends this 
+single-source, kinematic setting considerably further: rather than 
+transferring within a family of smooth, edgeless shapes, we extract 
+synergies from a single cube and evaluate generalization across 
+five geometries spanning a substantially wider range, including a sphere, 
+its near-opposite in contact structure. We do so within a full SAC+HER 
+training loop under sparse binary rewards, which allows the 
+policy to adapt the temporal activation of the frozen synergy basis to 
+each target object geometry.
+\begin{figure*}[t]
+        \centering
+        \includegraphics[width=\textwidth]{figures/method_overview_1.png}
+        \caption[]{Framework overview: Stage~A trains a full-DoF
+        SAC agent on the source task. Stage~B extracts the synergy basis
+        offline via PCA. Stage~C trains a synergy-constrained SAC agent
+        on each target task using the frozen decoder.}
+        \label{fig:method-overview}
+\end{figure*}
+
+Andrychowicz et al.~\cite{c7} demonstrated that RL policies trained entirely 
+in simulation on the Shadow Dexterous Hand can transfer to a real robot 
+using domain randomisation, operating in the full 20-dimensional joint 
+space at the cost of enormous computational resources. Plappert et 
+al.~\cite{c16} introduced the multi-goal manipulation benchmarks on the Shadow 
+Hand used throughout this paper, providing the first systematic evaluation 
+of DDPG combined with HER on in-hand reorientation tasks. Hindsight 
+Experience Replay~\cite{c17} addresses the fundamental difficulty of learning 
+from sparse binary rewards in high-dimensional spaces by relabeling failed 
+trajectories with goals that were actually achieved, recovering a dense 
+learning signal from otherwise uninformative episodes. For policy 
+optimisation, we adopt Soft Actor-Critic~\cite{c15}, an off-policy 
+maximum-entropy algorithm that has become the standard for 
+continuous-control benchmarks due to its sample efficiency and principled 
+exploration.
+
+The present work occupies a specific and previously unexplored position in 
+this space. Like Santello et al. and Ciocarlie and Allen, we study 
+postural-level kinematic synergies extracted via PCA. We learn these synergies from DRL agent trajectories rather 
+than human data, and we freeze the basis for transfer to novel tasks. 
+Unlike any of the above, we combine these ingredients in the specific 
+setting of multi-finger in-hand reorientation on the Shadow Dexterous Hand 
+with sparse binary rewards and HER, demonstrating that a kinematic synergy 
+basis extracted from a single source object accelerates learning on objects 
+whose geometry was never seen during synergy extraction.
+
+
+\section{METHODS}
+
+We address the task of \textit{dexterous in-hand reorientation}: an object is placed on the palm of the Shadow Dexterous Hand. It must grasp and rotate the object from a randomised initial orientation to a randomised target orientation, without releasing it, as 
+shown in Fig.~\ref{fig:cube_sequence}. The task is formulated as a 
+multi-goal Markov Decision Process \cite{c16}: the policy $\pi(a|s,g)$ is conditioned on both the state $s$ and the goal $g$, and the reward is computed through a goal-parametrised function $r(s,g)$ rather than a single fixed reward. This decoupling of state and goal is what allows HER to relabel a failed trajectory with a goal it actually achieved, recovering a learning signal from otherwise uninformative episodes. At the beginning of each episode a
+target orientation is sampled uniformly from SO(3), and the agent must
+reach it within a rotational tolerance of $\epsilon_r = 0.1$\,rad and a
+positional tolerance of $\epsilon_p = 1$\,cm. The reward is sparse and
+binary: the agent receives $0$ upon success and $-1$ otherwise. The
+control frequency is 25\,Hz, and each episode lasts a fixed $T = 100$
+simulation steps regardless of task completion, as these tasks are non-time-dependent continuing tasks with no early termination on success. Following the hand-manipulation environments of \cite{c16}, the observation includes the 24 joint positions and velocities of the Shadow Dexterous Hand, together with the manipulated object's Cartesian position and quaternion orientation, and its linear and angular velocities. We consider two observation conditions: a base condition using this state alone, and a touch-sensor condition that augments it with 92 continuous tactile readings distributed across the hand surface.
+
+We report two complementary success criteria throughout this paper.
+Under the \emph{sustained-hold} criterion, an episode is successful if
+the achieved and target orientations are within tolerance at the
+episode's final timestep; this is the primary criterion used for the
+learning curves and sample/wall-clock efficiency comparisons in
+Section~\ref{sec:experiments}. Under the \emph{reorientation} criterion, an episode is
+successful if the tolerance is satisfied at any timestep during the
+episode, regardless of whether it is subsequently maintained; we report
+this as a complementary metric to characterise how often the target
+orientation is reached at all, independently of the agent's ability to
+stabilise the object once there.
+
+We consider six object geometries in total: one for the \textit{source task} and five for the \textit{target tasks}. The \textit{source task} uses a cube of side $0.025$\,m. The five \textit{target tasks} include two scaled variants of the source cube, a small cube ($0.020$\,m side) and a large cube ($0.030$\,m side), and three shapes with substantially different contact geometry from the cube: an egg (ellipsoid, $r_x = r_y = 0.030$\,m, $r_z = 0.040$\,m), a cylinder (radius $0.030$\,m, height $0.050$\,m), and a sphere (radius $0.033$\,m). The small and large cubes were obtained by modifying the object geometry in the MuJoCo XML of the source cube, the egg environment is used unmodified from Gymnasium-Robotics \cite{c18}, and the cylinder and sphere environments were newly created for this work.
+
+We propose a three-stage pipeline, illustrated in 
+Fig.~\ref{fig:method-overview}, whose key design principle is that the 
+synergy basis extracted in Stage~B is never re-fitted or fine-tuned on 
+the target tasks: the same low-dimensional motor vocabulary is reused 
+identically across all target objects. Both the full-action-space 
+baseline and the synergy-constrained agent share the same network 
+architecture: actor and critics are multi-layer perceptrons with two 
+hidden layers of 256 units and ReLU activations. The only architectural 
+difference is the output dimension of the actor (20 for the baseline, 
+$K = 5$ for the synergy-constrained agent) and the corresponding input 
+dimension of the critics. All other hyperparameters are kept identical, 
+so that any observed difference in learning performance can be attributed 
+solely to the action-space parameterisation.
+
+\subsection{Stage A: Full-DoF source task training}
+
+In Stage A, the agent is trained on the source task acting directly in the 20-dimensional joint command space of the Shadow Dexterous Hand. The cubic geometry of the source object, with flat faces, sharp edges, 
+and rotational symmetry, requires the hand to produce a rich and 
+varied repertoire of multi-finger coordination patterns across arbitrary 
+target orientations. This diversity ensures that the joint-action 
+trajectories of the converged policy span many directions in the 
+20-dimensional action space, so that the resulting synergy basis is not 
+overfitted to a single geometry and can be reused across all target 
+tasks. The Stage~A agent is trained for $6 \times 10^6$ environment
+timesteps, reaching a sustained-hold success rate of approximately 50\%
+and a reorientation success rate of 95\% over 100 deterministic
+evaluation episodes. Because the synergy basis is extracted from the
+joint-action trajectories generated while approaching the target
+orientation (Stage~B, below), rather than from the agent's ability to
+sustain the final pose for the remainder of the episode, this training
+budget is sufficient to produce a rich and diverse repertoire of
+coordinated multi-finger reaching behaviours suitable for synergy
+extraction.
+
+\subsection{Stage B: Synergy extraction}
+
+Once the Stage~A policy has converged, it is frozen and executed for 
+$N = 200$ evaluation rollouts of length $T = 100$ timesteps each. At 
+every timestep we record the commanded joint action 
+$a_t \in \mathbb{R}^{20}$, yielding a data matrix 
+$X \in \mathbb{R}^{20{,}000 \times 20}$.
+
+Spatial synergies are extracted from $X$ via PCA. The centred matrix 
+$\tilde{X} = X - \mathbf{1}\bar{x}^\top$ is decomposed via SVD, and 
+the top-$K$ right singular vectors form the rows of the synergy matrix 
+$W \in \mathbb{R}^{K \times 20}$. Each row $w_k$ is a spatial synergy: 
+a coordinated pattern of joint displacements that can be linearly 
+combined with others to approximate the original joint commands. The 
+reconstruction of a single action sample reads
+%
+\begin{equation}
+    a_t \approx \bar{x} + \sum_{k=1}^{K} h_{tk}\, w_k = W^\top h_t + \bar{x},
+    \label{eq:decoder}
+\end{equation}
+%
+where $h_t \in \mathbb{R}^K$ are the synergy activations and $\bar{x}$ 
+is the mean action vector.
+
+The number of retained components $K$ is chosen by combining 
+reconstruction quality with task-performance evaluation. We compute the 
+mean per-DoF coefficient of determination $\overline{R^2}(K)$ on a 
+held-out test set (20\% of rollouts, split by trajectory to avoid 
+temporal leakage). $\overline{R^2}$ rises steeply in the first few
+components and saturates only slowly thereafter: $K=17$ components are
+required to reach $\overline{R^2} = 0.946$, and the full 20 components
+are needed for exact reconstruction ($\overline{R^2}=1$). However,
+saturating reconstruction is not the correct objective: retaining 17 of
+20 dimensions would defeat the purpose of the method. We therefore set
+$K = 5$, which captures $\overline{R^2} = 0.512$ of the total variance
+and is entirely sufficient to learn all target tasks with a substantial
+advantage over the baseline.
+
+\subsection{Stage C: Synergy-constrained target task training}
+
+In Stage~C, a new SAC+HER agent is trained on each target task. The 
+policy $\pi_\theta(h \mid s, g)$ outputs a $K$-dimensional synergy 
+activation vector $h_t \in \mathbb{R}^K$ instead of a direct joint 
+command. At every control step, the activation is decoded into a full 
+20-dimensional joint command via the fixed affine map of 
+\eqref{eq:decoder}, clipped to the simulator's native bounds $[-1, 1]$ 
+and applied to the hand. The decoder parameters $W$ and $\bar{x}$ 
+receive no gradient updates during Stage~C; they are loaded once from 
+Stage~B and remain frozen for every target task.
+
+The synergy activation space is bounded by $[-h_{\max}, h_{\max}]$ with 
+$h_{\max} = 3.0$. Setting $h_{\max} = 1.0$ to match the native action 
+bounds proved insufficient, as the PCA activations span a range 
+considerably larger than $[-1, 1]$; expanding to $h_{\max} = 3.0$ 
+resolved poor learning progress across all objects.
+
+\section{EXPERIMENTS}
+\label{sec:experiments}
+
+\subsection{Experimental setup}
+
+\begin{table}[b]
+        \caption{SAC+HER hyperparameters}
+        \label{tab:hyperparam}
+        \begin{center}
+        \begin{tabular}{ll}
+        \hline
+        \textbf{Hyperparameter} & \textbf{Value} \\
+        \hline
+        Learning rate (actor and critics) & $3 \times 10^{-4}$ \\
+        Batch size & 256 \\
+        Discount factor $\gamma$ & 0.99 \\
+        Replay buffer size & $10^6$ \\
+        HER strategy & future \\
+        HER relabelled goals & 8 \\
+        Entropy target & $-0.8 \times \dim(\mathcal{A})$ \\
+        Synergy activation range $h_{\max}$ & 3.0 \\
+        Hidden layers & {[256, 256]} \\
+        Training timesteps & $3 \times 10^6$ \\
+        \hline
+        \end{tabular}
+        \end{center}
+        \end{table}
+
+
+All experiments are conducted in simulation using MuJoCo, on top of the
+in-hand manipulation environments from Gymnasium-Robotics~\cite{c18}. All 
+experiments use the touch-sensor variant of each environment, augmenting
+the observation with 92 continuous tactile readings distributed across 
+the hand surface. The synergy basis is extracted once from the standard 
+cube source task and reused without modification across all five targets. 
+
+
+For each target task, two agents are trained: the \emph{full-action-space} 
+baseline, operating in the native 20-dimensional joint space, and the 
+\emph{synergy-constrained} agent, operating in the 5-dimensional synergy 
+activation space. All hyperparameters are identical between the two agents and are listed in
+Table~\ref{tab:hyperparam}. Each agent is trained for $3 \times 10^6$ 
+environment timesteps with SAC combined with HER, and every experiment is 
+repeated with 3 independent random seeds. Success rate is evaluated over 
+50 deterministic rollouts at regular intervals during training.
+
+
+\subsection{Results}
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\textwidth]{figures/panels/cylinder.pdf}
+    %\caption{}
+    \label{fig:curves}
+
+    \centering
+    \includegraphics[width=\textwidth]{figures/panels/egg.pdf}
+    %\caption{}
+    \label{fig:curves}
+\end{figure*}
+
+
+%\begin{table}[t]
+    %\caption{Sampling duration to success threshold %%(timesteps, M).
+    %SC = synergy-constrained, BL = baseline.
+    %Values are mean $\pm$ std across 3 seeds.}
+    %\label{tab:steps}
+    %\begin{center}
+    %\begin{tabular}{lcc}
+    %\hline
+    %\textbf{Object} & \textbf{BL} & \textbf{SC} \\
+    %\hline
+    %Small cube  & $2.47 \pm 0.09$ & $1.37 \pm 0.12$ \\
+    %Large cube  & $2.80 \pm 0.14$ & $1.43 \pm 0.26$ \\
+    %Egg         & $1.47 \pm 0.17$ & $0.73 \pm 0.05$ \\
+    %Cylinder    & $1.77 \pm 0.17$ & $0.63 \pm 0.05$ \\
+    %Sphere      & $1.10 \pm 0.16$ & $0.23 \pm 0.05$ \\
+    %\hline
+    %\end{tabular}
+    %\end{center}
+%\end{table}
+
+%\begin{table}[t]
+    %\caption{Wall-clock time to success threshold.
+    %SC = synergy-constrained, BL = baseline.
+    %Values are mean $\pm$ std across 3 seeds.}
+    %\label{tab:time}
+    %\begin{center}
+    %\begin{tabular}{lcc}
+    %\hline
+    %\textbf{Object} & \textbf{BL} & \textbf{SC} \\
+    %\hline
+    %Small cube  & $7$h$19$m $\pm 18$m & $3$h$44$m $\pm %18$m \\
+    %Large cube  & $5$h$16$m $\pm 16$m & $2$h$44$m $\pm %31$m \\
+    %Egg         & $4$h$16$m $\pm 25$m & $2$h$00$m $\pm %8$m  \\
+    %Cylinder    & $5$h$20$m $\pm 29$m & $1$h$49$m $\pm %7$m  \\
+    %Sphere      & $3$h$04$m $\pm 26$m & $0$h$37$m $\pm 
+    %7$m  \\
+    %\hline
+    %\end{tabular}
+    %\end{center}
+%\end{table}
+
+To evaluate the efficacy and generalization capability of the proposed single-source synergy-constrained policy, we conduct a comparative analysis against the full-DoF baseline across the five novel target tasks. The primary metrics are sample efficiency (the number of environment interactions required to achieve task proficiency) and wall-clock training duration. Overall, the empirical results reveal a decisive and consistent advantage for the synergy-constrained agent across all evaluated geometric variations, validating our core hypothesis that a frozen, low-dimensional motor vocabulary can effectively govern manipulation for unseen object shapes.
+
+
+The learning curves and efficiency metrics are shown in 
+Fig.~\ref{fig:curves} and Tables~\ref{tab:steps} and~\ref{tab:time} 
+respectively. For objects where both agents converge to 100\% success 
+rate within the training budget, we adopt an absolute threshold of 80\%. 
+Where convergence to 100\% is not achieved, we adopt a relative threshold 
+of 60\% of the peak mean success rate across both agents. The egg and 
+sphere use the absolute 80\% threshold; the small cube, large cube, and 
+cylinder use the relative threshold.
+
+The efficiency gain varies across objects but remains consistent 
+regardless of geometric proximity to the source cube. On the small 
+cube, the synergy-constrained agent reaches the success threshold in 
+$1.37 \pm 0.12 \times 10^6$ timesteps ($3$h$44$m $\pm 18$m), compared 
+to $2.47 \pm 0.09 \times 10^6$ timesteps ($7$h$19$m $\pm 18$m) for the 
+baseline, a reduction of approximately 44\% in sampling duration and 
+49\% in wall-clock time. On the large cube, the synergy-constrained 
+agent reaches the threshold in $1.43 \pm 0.26 \times 10^6$ timesteps 
+($2$h$44$m $\pm 31$m) versus $2.80 \pm 0.14 \times 10^6$ timesteps 
+($5$h$16$m $\pm 16$m) for the baseline, a reduction of approximately 
+49\% in sampling duration and 48\% in wall-clock time. Despite the 
+increased object size relative to the source cube, the synergy advantage 
+on the large cube is comparable to that on the small cube, suggesting 
+that the synergy prior is robust to moderate changes in object scale 
+within the same geometric family.
+
+The egg result is particularly notable. The synergy-constrained agent 
+reaches the 80\% success threshold in $0.73 \pm 0.05 \times 10^6$ 
+timesteps ($2$h$00$m $\pm 8$m), compared to $1.47 \pm 0.17 \times 10^6$ 
+timesteps ($4$h$16$m $\pm 25$m) for the baseline, a reduction of 
+approximately 50\% in sampling duration and 53\% in wall-clock time. 
+This result is significant because the egg geometry is qualitatively 
+different from the cubic source task: it has no edges or flat faces, 
+which fundamentally changes the contact geometry relative to the source 
+cube. The fingers must exert carefully balanced forces on a curved 
+surface to prevent the object from rolling out of the grasp, a contact 
+regime that is never encountered during synergy extraction. The fact 
+that the synergy basis transfers effectively despite this qualitative 
+difference in contact geometry demonstrates that the extracted 
+coordination patterns are not specific to flat-face manipulation but 
+capture more general multi-finger primitives that generalise across 
+object shapes.
+
+On the cylinder, the synergy-constrained agent reaches the threshold 
+in $0.63 \pm 0.05 \times 10^6$ timesteps ($1$h$49$m $\pm 7$m) versus 
+$1.77 \pm 0.17 \times 10^6$ timesteps ($5$h$20$m $\pm 29$m) for the 
+baseline, a reduction of approximately 64\% in sampling duration and 
+66\% in wall-clock time. The cylinder presents a distinctive grasping 
+challenge: unlike the cube, it has no edges to anchor the fingers 
+against, and its flat end-caps alternate with a curved lateral surface, 
+requiring the hand to continuously adapt its contact configuration 
+depending on the current orientation of the object. The speedup on the 
+cylinder is the largest among the non-spherical objects, which we 
+attribute to the combination of a relatively simple contact geometry 
+and the reduced action space allowing the policy to discover effective 
+grasping strategies more efficiently than the baseline.
+
+The sphere task yields the most striking result. The synergy-constrained 
+agent reaches the 80\% threshold in only $0.23 \pm 0.05 \times 10^6$ 
+timesteps ($0$h$37$m $\pm 7$m), compared to $1.10 \pm 0.16 \times 10^6$ 
+timesteps ($3$h$04$m $\pm 26$m) for the baseline, a reduction of 
+approximately 79\% in sampling duration and 80\% in wall-clock time, 
+corresponding to a roughly $5\times$ acceleration. We attribute this to 
+the high symmetry of the spherical geometry: a sphere presents an 
+identical contact surface in every orientation, making the reorientation 
+task intrinsically simpler than for objects with edges or flat faces. The 
+synergy basis provides an immediately effective exploration prior, and 
+the reduced dimensionality of the action space allows the policy to 
+exploit this prior with very few samples. \\
+
+Across all five objects, the synergy-constrained agent reaches comparable 
+or higher final success rates than the baseline while requiring 
+substantially fewer environment interactions and less wall-clock training 
+time. The consistent advantage across objects that were never seen during 
+synergy extraction demonstrates that the extracted basis acts as a 
+geometry-agnostic motor prior for dexterous in-hand manipulation.
+
+
+
+\section{DISCUSSION}
+\subsection{Mechanisms of Cross-Geometry Generalization}
+The central and most notable finding of this work is that the synergy basis extracted from the cubic geometry transfers effectively to objects with entirely different topologies and contact profiles, such as the egg and the cylinder. We attribute this robust generalization to the intrinsic properties of the source task. The standard cube possesses sharp edges, flat faces, and vertices, requiring the 20-DoA (Degree of Actuation) hand to generate a highly diverse dictionary of coordinated multi-finger behaviors. 
+
+Consequently, the PCA in Stage B does not merely memorize "cube-specific" poses. Instead, it distills the fundamental kinematic primitives of anthropomorphic manipulation, such as coordinated finger flexion/extension and opposing thumb movements. When transferred to an egg or a cylinder, these primitives serve as a highly effective exploration prior. While the baseline agent in the full 20-dimensional action space wastes millions of samples exploring destructive, uncoordinated joint movements that often lead to dropping the object, the synergy-constrained agent is restricted to exploring within a subspace of naturally coordinated movements, drastically reducing the search space while maintaining the capacity to manipulate novel geometries.
+
+
+\subsection{Trade-off Between Dimensionality and Policy Expressivity}
+In Stage B, we selected $K=5$ principal components, which accounted for approximately 50\% of the total variance in the source trajectory data. From a purely kinematic reconstruction standpoint, a 50\% variance capture is relatively low, and full reconstruction of the policy trajectories requires nearly 17 components. However, our results demonstrate a key paradox in synergy-based control: maximizing spatial reconstruction accuracy is not equivalent to maximizing reinforcement learning efficiency. 
+
+Retaining 17 dimensions does not constitute a substantial reduction in dimensionality and would defeat the purpose of the method. Conversely, restricting the action space to $K=5$ acts as a powerful regularizer. Although a fixed 5-dimensional spatial decoder introduces geometric reconstruction errors, we hypothesize that the online DRL agent in Stage C overcomes this spatial limitation through \textit{temporal adaptation}. Because the SAC policy can dynamically modulate the activations $h_t$ at 25 Hz, it learns to sequentially combine the frozen spatial primitives over time to fit the unique curvatures of the target objects. This strongly suggests that the time-varying combination of a small, rigid spatial vocabulary is sufficient for highly adaptive dexterous manipulation.
+
+\subsection{Limitations and Boundary Conditions}
+Despite the robust generalization achieved across the evaluated shapes, several boundary conditions must be acknowledged. First, the spatial decoder extracted via PCA remains entirely linear and static throughout Stage C. While temporal modulation mitigates spatial inaccuracies, a rigid linear subspace inherently bounds the ultimate expressivity of the hand. For highly complex, asymmetric, or non-convex objects, a fixed 5-dimensional linear prior derived from a symmetric cube may over-regularize the system, preventing the generation of highly specific behaviors needed to manipulate tools with distinct handles or fragile articulated mechanisms. 
+
+Second, our approach still requires a full training loop on each target task; the synergy basis accelerates learning but does not eliminate the need for target-specific training.
+
+Third, our current pipeline is evaluated within a simulated environment (MuJoCo). While the use of 92 continuous tactile readings provides rich sensory feedback, simulation models often simplify critical real-world phenomena such as soft-pad deformation, material friction variance, and actuator backlash. Transitioning the synergy-constrained policy to a physical platform without further domain randomization or online calibration could lead to performance degradation due to the sim-to-real gap.
+
+\subsection{Future Work}
+To address these limitations, our immediate future work will focus on introducing \textit{online synergy adaptation}. Instead of completely freezing the parameters $W$ and $\overline{x}$ in Stage C, we plan to implement a slow-moving meta-learning loop or parameter-efficient fine-tuning (PEFT) layers to allow the low-dimensional motor vocabulary to slowly warp and fit highly anomalous target geometries. 
+
+Additionally, we aim to transition from a purely linear PCA mapping to non-linear action decoders, such as deep variational autoencoders (VAEs), to capture more complex, non-linear joint correlations while keeping the action space low-dimensional. Finally, we intend to deploy the learned policies on a physical robotic hand. By incorporating robust domain randomization over tactile noise and contact friction during the Stage C training, we expect the synergy-constrained policy to exhibit superior resilience during physical sim-to-real transfer compared to full-DoF alternatives. 
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{CONCLUSIONS}
+In this work, we presented a novel three-stage pipeline for single-source synergy-constrained policy learning to address the critical sample inefficiency bottleneck in dexterous multi-finger in-hand manipulation. By training a full-DoF Soft Actor-Critic agent on a single standard cube reorientation task, extracting spatial synergies offline via Principal Component Analysis, and freezing the resulting $K=5$ dimensional synergy basis as a static action decoder, we successfully constrained the exploration space for novel target objects without any target-specific fine-tuning of the decoder parameters.  Our empirical evaluations on the 20-DoF Shadow Dexterous Hand across five geometrically diverse target tasks—encompassing scaled cubes, an ellipsoid egg, a cylinder, and a sphere—demonstrate that this low-dimensional kinematic prior consistently and significantly accelerates DRL. The proposed approach yielded substantial reductions in both sampling duration and wall-clock training time across all novel shapes, culminating in a striking 6x training acceleration on the spherical geometry.  Crucially, these findings demonstrate that coordination primitives distilled from a single source object can generalize effectively as geometry-agnostic motor priors. This validates the bio-inspired hypothesis that a compact, rigid spatial vocabulary, when paired with high-frequency temporal modulation, provides sufficient expressivity to manipulate unseen physical structures. As single source hand synergy can be practically obtained, this approach also contributes to reduce burden for large real data collection for robot hand learning.
+Ultimately, this framework offers a highly efficient and scalable paradigm for training high-dimensional anthropomorphic hands, bringing us a step closer to achieving fluid, human-like dexterity in unstructured environments. 
+
+
+\begin{thebibliography}{99}
+
+        \bibitem{c1}
+        Y. Huang, D. Fan, H. Duan, D. Yan, W. Qi, J. Sun, Q. Liu, and P. Wang, ``Human-like dexterous manipulation for anthropomorphic five-fingered hands: A review,'' \emph{Biomimetic Intelligence and Robotics}, vol. 5, no. 1, Art. no. 100212, 2025.
+
+        \bibitem{c2}
+        N. A. Bernstein, ``The coordination and regulation of movements,'' \emph{Pergamon Press}, 1967.
+        
+        \bibitem{c3}
+        M. Santello, M. Flanders, and J. F. Soechting, ``Postural hand synergies for tool use,'' \emph{The Journal of Neuroscience}, vol. 18, no. 23, pp. 10105--10115, 1998.
+
+        \bibitem{c4}
+        A. d'Avella and E. Bizzi, ``Shared and specific muscle synergies in natural motor behaviors,'' \emph{Proceedings of the National Academy of Sciences}, vol. 102, no. 8, pp. 3076--3081, 2005.
+
+        \bibitem{c5}
+        M. Al Borno, J. L. Hicks, and S. L. Delp, ``The effects of motor modularity on performance, learning and generalizability in upper-extremity reaching: a computational analysis,'' \emph{Journal of The Royal Society Interface}, vol. 17, no. 167, Art. no. 20200011, 2020.
+
+        \bibitem{c6}
+        T. P. Lillicrap, J. J. Hunt, A. Pritzel, N. Heess, T. Erez, Y. Tassa, D. Silver, and D. Wierstra, ``Continuous control with deep reinforcement learning,'' in \emph{International Conference on Learning Representations (ICLR)}, 2016.
+
+        \bibitem{c7}
+        OpenAI, M. Andrychowicz, B. Baker, M. Chociej, R. Jozefowicz, B. McGrew, J. Pachocki, A. Petron, M. Plappert, G. Powell, \emph{et al.}, ``Learning dexterous in-hand manipulation,'' \emph{The International Journal of Robotics Research}, vol. 39, no. 1, pp. 3--32, 2020.
+
+        \bibitem{c8}
+        K. Kutsuzawa and M. Hayashibe, ``Motor synergy generalization framework for new targets in multi-planar and multi-directional reaching task,'' \emph{Royal Society Open Science}, vol. 9, no. 3, Art. no. 211721, 2022.
+
+        \bibitem{c9}
+        C. Berg, V. Caggiano, and V. Kumar, ``SAR: generalization of physiological agility and dexterity via synergistic action representation,'' \emph{Autonomous Robots}, vol. 48, no. 8, Art. no. 10182-4, 2024.
+
+        \bibitem{c10}
+        M. T. Ciocarlie and P. K. Allen, ``Hand posture subspaces for dexterous robotic grasping,'' \emph{The International Journal of Robotics Research}, vol. 28, no. 7, pp. 851--867, 2009.
+
+        \bibitem{c11}
+        M. G. Catalano, G. Grioli, E. Farnioli, A. Serio, C. Piazza, and A. Bicchi, ``Adaptive synergies for the design and control of the Pisa/IIT SoftHand,'' \emph{The International Journal of Robotics Research}, vol. 33, no. 5, pp. 768--782, 2014.
+
+        \bibitem{c12}
+        C. Della Santina, C. Piazza, G. Grioli, M. G. Catalano, and A. Bicchi, ``Toward dexterous manipulation with augmented adaptive synergies: The Pisa/IIT SoftHand 2,'' \emph{IEEE Transactions on Robotics}, vol. 34, no. 5, pp. 1141--1156, 2018.
+
+        \bibitem{c13}
+        J. Chai and M. Hayashibe, ``Motor synergy development in high-performing deep reinforcement learning algorithms,'' \emph{IEEE Robotics and Automation Letters}, vol. 5, no. 2, pp. 1271--1278, 2020.
+
+        \bibitem{c14}
+        J. Han, J. Chai, and M. Hayashibe, ``Synergy emergence in deep reinforcement learning for full-dimensional arm manipulation,'' \emph{IEEE Transactions on Medical Robotics and Bionics}, vol. 3, no. 2, pp. 498--509, 2021.
+
+        \bibitem{c15}
+        T. Haarnoja, A. Zhou, P. Abbeel, and S. Levine, ``Soft actor-critic: Off-policy maximum entropy deep reinforcement learning with a stochastic actor,'' in \emph{International Conference on Machine Learning (ICML)}, pp. 1861--1870, 2018.
+
+        \bibitem{c16}
+        M. Plappert, M. Andrychowicz, A. Ray, B. McGrew, B. Baker, G. Powell, J. Pachocki, W. Tworek, C. Cobbe, R. Vineet, \emph{et al.}, ``Multi-goal reinforcement learning: Challenging robotics environments and request for research,'' \emph{arXiv preprint arXiv:1802.09464}, 2018.
+
+        \bibitem{c17}
+        M. Andrychowicz, F. Wolski, A. Ray, J. Schneider, R. Fong, P. Welinder, B. McGrew, J. Tobin, P. Abbeel, and W. Zaremba, ``Hindsight experience replay,'' in \emph{Advances in Neural Information Processing Systems (NeurIPS)}, vol. 30, 2017.
+
+        \bibitem{c18}
+        R. de Lazcano, K. Andreas, J. J. Tai, S. R. Lee, and J. Terry, ``Gymnasium Robotics,'' in \emph{Farama Foundation}, 2024. 
+
+        \bibitem{c19}
+        A. Fukunishi, K. Kutsuzawa, D. Owaki, and M. Hayashibe, 
+        ``Synergy quality assessment of muscle modules for determining 
+        learning performance using a realistic musculoskeletal model,'' 
+        \emph{Frontiers in Computational Neuroscience}, vol. 18, 
+        Art. no. 1355855, 2024.
+
+        \bibitem{c20} 
+        T. Chen, J. Xu, and P. Agrawal, 
+        ``A system for general in-hand object 
+        re-orientation,'' 
+        \emph{Proceedings of the 5th Conference on Robot Learning (CoRL)}, 2022, pp. 297-307.
+                
+        \bibitem{21}
+        E. Todorov and Z. Ghahramani, 
+        ``Analysis of the synergies underlying 
+        complex hand manipulation,''  
+        \emph{Proceedings of the 26th Annual International Conference of the IEEE Engineering in Medicine and 
+        Biology Society},
+        vol. 2, 2004, pp. 4637-4640.
+        
+        \bibitem{c22}
+        M. Berniker, A. Jarc, E. Bizzi, and M. C. Tresch, ``Simplified and 
+        effective motor control based on muscle synergies to exploit 
+        musculoskeletal dynamics,'' \emph{Proceedings of the National Academy 
+        of Sciences}, vol. 106, pp. 7601--7606, 2009.
+
+        \bibitem{c23}
+        A. Rajeswaran, V. Kumar, A. Gupta, G. Vezzani, J. Schulman, E. Todorov, and 
+        S. Levine, ``Learning complex dexterous manipulation with deep reinforcement 
+        learning and demonstrations,'' in \emph{Robotics: Science and Systems (RSS)}, 
+        2018.
+
+\end{thebibliography}
+        
+
+
+
+
+\end{document}

@@ -47,9 +47,16 @@ LABEL_SYN  = "Synergy"
 
 def load_curve(sensor_key: str, metric: str, obj_cfg: dict, args):
     """
-    Return (ts_base, succ_base, ts_syn, succ_syn) for one cell, or None if
-    obj_cfg has no block for this sensor_key (e.g. no-sensor data not ready
-    yet -- the panel still renders, that cell just shows "no data").
+    Return (ts_base, succ_base, ts_syn, succ_syn, base_runs, syn_runs) for one
+    cell, or None if obj_cfg has no block for this sensor_key (e.g. no-sensor
+    data not ready yet -- the panel still renders, that cell just shows
+    "no data").
+
+    base_runs/syn_runs (the wandb Run objects) are returned alongside the
+    curves for "sustained" cells only -- they're needed afterwards to look
+    up wall-clock time at the threshold-crossing step. "reach" cells return
+    None for both: efficiency-to-threshold is only computed on sustained-hold
+    (the primary metric; see report.tex Section III), reach is descriptive only.
     """
     block = obj_cfg.get(sensor_key)
     if block is None:
@@ -62,11 +69,49 @@ def load_curve(sensor_key: str, metric: str, obj_cfg: dict, args):
             args.wandb_project, args.wandb_entity, block["synergy_wandb_group"])
         ts_base, succ_base = plot_lib.align_and_stack_wandb(base_runs, args.wandb_metric)
         ts_syn, succ_syn = plot_lib.align_and_stack_wandb(syn_runs, args.wandb_metric)
-    else:
-        ts_base, succ_base = plot_lib.align_and_stack(block["baseline_dirs"], "successes")
-        ts_syn, succ_syn = plot_lib.align_and_stack(block["synergy_dirs"], "successes")
+        return ts_base, succ_base, ts_syn, succ_syn, base_runs, syn_runs
 
-    return ts_base, succ_base, ts_syn, succ_syn
+    ts_base, succ_base = plot_lib.align_and_stack(block["baseline_dirs"], "successes")
+    ts_syn, succ_syn = plot_lib.align_and_stack(block["synergy_dirs"], "successes")
+    return ts_base, succ_base, ts_syn, succ_syn, None, None
+
+
+def print_sustained_efficiency(label: str, curves, relative_threshold_frac: float):
+    """
+    Print sample- and wall-clock-efficiency (timesteps/time to cross a
+    relative threshold) for one sustained-hold cell, mirroring plot.py's
+    console output. Explicitly reports "NOT REACHED" (right-censored)
+    instead of a crossing time when a curve's final mean value never
+    reaches the threshold -- printing ts[-1] there would silently claim a
+    crossing that didn't happen.
+    """
+    ts_base, succ_base, ts_syn, succ_syn, base_runs, syn_runs = curves
+
+    peak = max(succ_base.mean(axis=0).max(), succ_syn.mean(axis=0).max())
+    threshold = relative_threshold_frac * float(peak) if peak < 1.0 else 0.80
+
+    ttt_base = plot_lib.time_to_threshold(ts_base, succ_base, threshold)
+    ttt_syn = plot_lib.time_to_threshold(ts_syn, succ_syn, threshold)
+    wc_base = plot_lib.wall_clock_to_threshold_wandb(base_runs, ttt_base)
+    wc_syn = plot_lib.wall_clock_to_threshold_wandb(syn_runs, ttt_syn)
+
+    def fmt_h(s):
+        s = int(s)
+        return f"{s // 3600}h {(s % 3600) // 60:02d}m"
+
+    def fmt_group(name, succ, ttt, wc):
+        reached = succ.mean(axis=0)[-1] >= threshold
+        steps_str = f"{[f'{v / 1e6:.3f}M' for v in ttt]}"
+        time_str = f"{[fmt_h(v) for v in wc]}"
+        if not reached:
+            steps_str += "  [NOT REACHED within budget -- value is end-of-training, not a crossing]"
+            time_str += "  [NOT REACHED within budget -- value is end-of-training, not a crossing]"
+        print(f"    {name:8s} steps: {steps_str}")
+        print(f"    {name:8s} time : {time_str}")
+
+    print(f"  --- {label}  (peak={peak * 100:.1f}%, threshold={threshold * 100:.1f}%) ---")
+    fmt_group("baseline", succ_base, ttt_base, wc_base)
+    fmt_group("synergy", succ_syn, ttt_syn, wc_syn)
 
 
 def draw_cell(ax, curves, show_threshold: bool, relative_threshold_frac: float):
@@ -80,7 +125,7 @@ def draw_cell(ax, curves, show_threshold: bool, relative_threshold_frac: float):
             spine.set_visible(False)
         return None
 
-    ts_base, succ_base, ts_syn, succ_syn = curves
+    ts_base, succ_base, ts_syn, succ_syn, _base_runs, _syn_runs = curves
     plot_lib.plot_band(ax, ts_base, succ_base, COLOR_BASE, LABEL_BASE)
     plot_lib.plot_band(ax, ts_syn, succ_syn, COLOR_SYN, LABEL_SYN)
 
@@ -117,6 +162,10 @@ def render_object_panel(obj_cfg: dict, args):
         ax.set_title(col_title, fontsize=8.5)
         if ci == 0:
             ax.set_ylabel("Success rate", fontsize=9)
+
+        if curves is not None and metric == "sustained":
+            label = f"{obj_cfg['name']} -- {col_title.replace(chr(10), ' ')}"
+            print_sustained_efficiency(label, curves, args.relative_threshold_frac)
 
     if legend_handles is not None:
         fig.legend(legend_handles, legend_labels, loc="lower center", ncol=2,
