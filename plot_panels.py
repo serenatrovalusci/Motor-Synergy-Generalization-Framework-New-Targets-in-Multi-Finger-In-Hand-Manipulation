@@ -25,6 +25,7 @@ import argparse
 import json
 import os
 
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import matplotlib.ticker as mticker
@@ -76,22 +77,50 @@ def load_curve(sensor_key: str, metric: str, obj_cfg: dict, args):
     return ts_base, succ_base, ts_syn, succ_syn, None, None
 
 
+def time_to_threshold_per_seed(ts, stacked, threshold: float):
+    """
+    Per-seed threshold crossing, as opposed to plot.py's time_to_threshold()
+    which finds a single crossing on the GROUP MEAN curve and replicates it
+    for every seed (giving a meaningless std of exactly 0). Here each seed's
+    own curve is checked independently.
+
+    Returns (crossing_times, all_crossed):
+      crossing_times[i] = ts[idx] of the first point where seed i's own
+        curve reaches `threshold`, or ts[-1] if it never does.
+      all_crossed = False if any seed never crosses -- callers should not
+        report a mean +- std over crossing_times in that case, since it
+        would silently blend a real crossing time with an end-of-training
+        placeholder.
+    """
+    crossing_times = []
+    all_crossed = True
+    for seed_curve in stacked:
+        idx = np.where(seed_curve >= threshold)[0]
+        if len(idx) > 0:
+            crossing_times.append(float(ts[idx[0]]))
+        else:
+            crossing_times.append(float(ts[-1]))
+            all_crossed = False
+    return np.array(crossing_times), all_crossed
+
+
 def print_sustained_efficiency(label: str, curves, relative_threshold_frac: float):
     """
     Print sample- and wall-clock-efficiency (timesteps/time to cross a
-    relative threshold) for one sustained-hold cell, mirroring plot.py's
-    console output. Explicitly reports "NOT REACHED" (right-censored)
-    instead of a crossing time when a curve's final mean value never
-    reaches the threshold -- printing ts[-1] there would silently claim a
-    crossing that didn't happen.
+    relative threshold) for one sustained-hold cell, using per-seed
+    crossing times so the reported spread is a real mean +- std across
+    seeds (see time_to_threshold_per_seed). Explicitly reports "NOT
+    REACHED" instead of a mean +- std when at least one seed never
+    crosses -- averaging in an end-of-training placeholder would
+    understate the true (unknown, censored) crossing time.
     """
     ts_base, succ_base, ts_syn, succ_syn, base_runs, syn_runs = curves
 
     peak = max(succ_base.mean(axis=0).max(), succ_syn.mean(axis=0).max())
     threshold = relative_threshold_frac * float(peak) if peak < 1.0 else 0.80
 
-    ttt_base = plot_lib.time_to_threshold(ts_base, succ_base, threshold)
-    ttt_syn = plot_lib.time_to_threshold(ts_syn, succ_syn, threshold)
+    ttt_base, base_all_crossed = time_to_threshold_per_seed(ts_base, succ_base, threshold)
+    ttt_syn, syn_all_crossed = time_to_threshold_per_seed(ts_syn, succ_syn, threshold)
     wc_base = plot_lib.wall_clock_to_threshold_wandb(base_runs, ttt_base)
     wc_syn = plot_lib.wall_clock_to_threshold_wandb(syn_runs, ttt_syn)
 
@@ -99,19 +128,19 @@ def print_sustained_efficiency(label: str, curves, relative_threshold_frac: floa
         s = int(s)
         return f"{s // 3600}h {(s % 3600) // 60:02d}m"
 
-    def fmt_group(name, succ, ttt, wc):
-        reached = succ.mean(axis=0)[-1] >= threshold
-        steps_str = f"{[f'{v / 1e6:.3f}M' for v in ttt]}"
-        time_str = f"{[fmt_h(v) for v in wc]}"
-        if not reached:
-            steps_str += "  [NOT REACHED within budget -- value is end-of-training, not a crossing]"
-            time_str += "  [NOT REACHED within budget -- value is end-of-training, not a crossing]"
-        print(f"    {name:8s} steps: {steps_str}")
-        print(f"    {name:8s} time : {time_str}")
+    def fmt_group(name, ttt, wc, all_crossed):
+        if all_crossed:
+            steps_mean, steps_std = ttt.mean() / 1e6, ttt.std() / 1e6
+            wc_mean, wc_std = wc.mean(), wc.std()
+            print(f"    {name:8s} steps: {steps_mean:.3f}M +/- {steps_std:.3f}M  {[f'{v / 1e6:.3f}M' for v in ttt]}")
+            print(f"    {name:8s} time : {fmt_h(wc_mean)} +/- {fmt_h(wc_std)}  {[fmt_h(v) for v in wc]}")
+        else:
+            print(f"    {name:8s} steps: NOT REACHED by all seeds within budget  {[f'{v / 1e6:.3f}M' for v in ttt]}  (per-seed, end-of-training where censored)")
+            print(f"    {name:8s} time : NOT REACHED by all seeds within budget  {[fmt_h(v) for v in wc]}  (per-seed, end-of-training where censored)")
 
     print(f"  --- {label}  (peak={peak * 100:.1f}%, threshold={threshold * 100:.1f}%) ---")
-    fmt_group("baseline", succ_base, ttt_base, wc_base)
-    fmt_group("synergy", succ_syn, ttt_syn, wc_syn)
+    fmt_group("baseline", ttt_base, wc_base, base_all_crossed)
+    fmt_group("synergy", ttt_syn, wc_syn, syn_all_crossed)
 
 
 def draw_cell(ax, curves, show_threshold: bool, relative_threshold_frac: float):
