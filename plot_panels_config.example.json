@@ -2,7 +2,7 @@
   "objects": [
     {
       "name": "Large cube",
-      "photo": "objects_shots/bigcube.png",
+      "photo": "objects_shots/cropped/bigcube.png",
       "with_sensors": {
         "baseline_wandb_group": "big_block_full",
         "synergy_wandb_group": "big_block_synergy_K5",
@@ -35,7 +35,7 @@
 
     {
       "name": "Cylinder",
-      "photo": "objects_shots/cylinder.png",
+      "photo": "objects_shots/cropped/cylinder.png",
       "with_sensors": {
         "baseline_wandb_group": "cylinder_full",
         "synergy_wandb_group": "cylinder_synergy_K5",
@@ -68,7 +68,7 @@
 
     {
       "name": "Sphere",
-      "photo": "objects_shots/sphere.png",
+      "photo": "objects_shots/cropped/sphere.png",
       "with_sensors": {
         "baseline_wandb_group": "sphere_full",
         "synergy_wandb_group": "sphere_synergy_K5",
@@ -101,7 +101,7 @@
 
     {
       "name": "Egg",
-      "photo": "objects_shots/egg.png",
+      "photo": "objects_shots/cropped/egg.png",
       "with_sensors": {
         "baseline_wandb_group": "full_egg",
         "synergy_wandb_group": "egg_synergy_K5",
