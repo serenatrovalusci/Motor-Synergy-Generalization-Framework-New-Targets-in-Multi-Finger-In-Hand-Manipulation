@@ -31,7 +31,108 @@
           "runs/no_sensor/big_block_nosensor_synergy_K5_seed2"
         ]
       }
+    },
+
+    {
+      "name": "Cylinder",
+      "photo": "objects_shots/cylinder.png",
+      "with_sensors": {
+        "baseline_wandb_group": "cylinder_full",
+        "synergy_wandb_group": "cylinder_synergy_K5",
+        "baseline_dirs": [
+          "runs/sensor/cylinder_full_seed0",
+          "runs/sensor/cylinder_full_seed1",
+          "runs/sensor/cylinder_full_seed2"
+        ],
+        "synergy_dirs": [
+          "runs/sensor/cylinder_synergy_K5_seed0",
+          "runs/sensor/cylinder_synergy_K5_seed1",
+          "runs/sensor/cylinder_synergy_K5_seed2"
+        ]
+      },
+      "no_sensors": {
+        "baseline_wandb_group": "cylinder_nosensor_full",
+        "synergy_wandb_group": "cylinder_nosensor_synergy_K5",
+        "baseline_dirs": [
+          "runs/no_sensor/cylinder_nosensor_full_seed0",
+          "runs/no_sensor/cylinder_nosensor_full_seed1",
+          "runs/no_sensor/cylinder_nosensor_full_seed2"
+        ],
+        "synergy_dirs": [
+          "runs/no_sensor/cylinder_nosensor_synergy_K5_seed0",
+          "runs/no_sensor/cylinder_nosensor_synergy_K5_seed1",
+          "runs/no_sensor/cylinder_nosensor_synergy_K5_seed2"
+        ]
+      }
+    },
+
+    {
+      "name": "Sphere",
+      "photo": "objects_shots/sphere.png",
+      "with_sensors": {
+        "baseline_wandb_group": "sphere_full",
+        "synergy_wandb_group": "sphere_synergy_K5",
+        "baseline_dirs": [
+          "runs/sensor/sphere_full_seed0",
+          "runs/sensor/sphere_full_seed1",
+          "runs/sensor/sphere_full_seed2"
+        ],
+        "synergy_dirs": [
+          "runs/sensor/sphere_synergy_K5_seed0",
+          "runs/sensor/sphere_synergy_K5_seed1",
+          "runs/sensor/sphere_synergy_K5_seed2"
+        ]
+      },
+      "no_sensors": {
+        "baseline_wandb_group": "sphere_nosensor_full",
+        "synergy_wandb_group": "sphere_nosensor_synergy_K5",
+        "baseline_dirs": [
+          "runs/no_sensor/sphere_nosensor_full_seed0",
+          "runs/no_sensor/sphere_nosensor_full_seed1",
+          "runs/no_sensor/sphere_nosensor_full_seed2"
+        ],
+        "synergy_dirs": [
+          "runs/no_sensor/sphere_nosensor_synergy_K5_seed0",
+          "runs/no_sensor/sphere_nosensor_synergy_K5_seed1",
+          "runs/no_sensor/sphere_nosensor_synergy_K5_seed2"
+        ]
+      }
+    },
+
+    {
+      "name": "Egg",
+      "photo": "objects_shots/egg.png",
+      "with_sensors": {
+        "baseline_wandb_group": "full_egg",
+        "synergy_wandb_group": "egg_synergy_K5",
+        "baseline_dirs": [
+          "runs/sensor/full_egg_seed0",
+          "runs/sensor/full_egg_seed1",
+          "runs/sensor/full_egg_seed2"
+        ],
+        "synergy_dirs": [
+          "runs/sensor/egg_synergy_K5_seed0",
+          "runs/sensor/egg_synergy_K5_seed1",
+          "runs/sensor/egg_synergy_K5_seed2"
+        ]
+      },
+      "no_sensors": {
+        "baseline_wandb_group": "egg_nosensor_full",
+        "synergy_wandb_group": "egg_nosensor_synergy_K5",
+        "baseline_dirs": [
+          "runs/no_sensor/egg_nosensor_full_seed0",
+          "runs/no_sensor/egg_nosensor_full_seed1",
+          "runs/no_sensor/egg_nosensor_full_seed2"
+        ],
+        "synergy_dirs": [
+          "runs/no_sensor/egg_nosensor_synergy_K5_seed0",
+          "runs/no_sensor/egg_nosensor_synergy_K5_seed1",
+          "runs/no_sensor/egg_nosensor_synergy_K5_seed2"
+        ]
+      }
     }
+
+
    
   ]
 }
