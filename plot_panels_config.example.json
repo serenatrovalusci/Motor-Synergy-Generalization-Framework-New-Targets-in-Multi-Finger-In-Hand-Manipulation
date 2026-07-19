@@ -1,34 +1,34 @@
 {
   "objects": [
     {
-      "name": "Cylinder",
-      "photo": "objects_shots/cylinder.png",
+      "name": "Large cube",
+      "photo": "objects_shots/bigcube.png",
       "with_sensors": {
-        "baseline_wandb_group": "cylinder_full",
-        "synergy_wandb_group": "cylinder_synergy_K5",
+        "baseline_wandb_group": "big_block_full",
+        "synergy_wandb_group": "big_block_synergy_K5",
         "baseline_dirs": [
-          "runs/sensor/cylinder_full_seed0",
-          "runs/sensor/cylinder_full_seed1",
-          "runs/sensor/cylinder_full_seed2"
+          "runs/sensor/big_block_full_seed0",
+          "runs/sensor/big_block_full_seed1",
+          "runs/sensor/big_block_full_seed2"
         ],
         "synergy_dirs": [
-          "runs/sensor/cylinder_synergy_K5_seed0",
-          "runs/sensor/cylinder_synergy_K5_seed1",
-          "runs/sensor/cylinder_synergy_K5_seed2"
+          "runs/sensor/big_block_synergy_K5_seed0",
+          "runs/sensor/big_block_synergy_K5_seed1",
+          "runs/sensor/big_block_synergy_K5_seed2"
         ]
       },
       "no_sensors": {
-        "baseline_wandb_group": "cylinder_nosensor_full",
-        "synergy_wandb_group": "cylinder_nosensor_synergy_K5",
+        "baseline_wandb_group": "big_block_nosensor_full",
+        "synergy_wandb_group": "big_block_nosensor_synergy_K5",
         "baseline_dirs": [
-          "runs/no_sensor/cylinder_nosensor_full_seed0",
-          "runs/no_sensor/cylinder_nosensor_full_seed1",
-          "runs/no_sensor/cylinder_nosensor_full_seed2"
+          "runs/no_sensor/big_block_nosensor_full_seed0",
+          "runs/no_sensor/big_block_nosensor_full_seed1",
+          "runs/no_sensor/big_block_nosensor_full_seed2"
         ],
         "synergy_dirs": [
-          "runs/no_sensor/cylinder_nosensor_synergy_K5_seed0",
-          "runs/no_sensor/cylinder_nosensor_synergy_K5_seed1",
-          "runs/no_sensor/cylinder_nosensor_synergy_K5_seed2"
+          "runs/no_sensor/big_block_nosensor_synergy_K5_seed0",
+          "runs/no_sensor/big_block_nosensor_synergy_K5_seed1",
+          "runs/no_sensor/big_block_nosensor_synergy_K5_seed2"
         ]
       }
     }
