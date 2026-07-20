@@ -777,8 +777,16 @@ def main():
             eval_env.norm_reward = False
 
             model = SAC.load(args.resume_from, env=train_env, device=args.device)
+            # The replay buffer is never saved in checkpoints, so it comes
+            # back empty here while model.num_timesteps is already far past
+            # --learning-starts -- without this, SB3 tries to sample a
+            # gradient-update batch from the (empty, no-completed-episode)
+            # buffer on the very first step. Re-anchor the warm-up window to
+            # this resume point instead of absolute step 0.
+            model.learning_starts = model.num_timesteps + args.learning_starts
             print(f"  Resumed at {model.num_timesteps} timesteps "
-                  f"(target: {args.timesteps})")
+                  f"(target: {args.timesteps}), "
+                  f"learning resumes at {model.learning_starts}")
         else:
             model = SAC(
                 "MultiInputPolicy",
