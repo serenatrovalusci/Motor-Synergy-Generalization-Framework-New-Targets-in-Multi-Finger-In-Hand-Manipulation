@@ -104,18 +104,25 @@ class TimeLoggingCallback(BaseCallback):
         - time/sec_per_100k_steps
     """
 
-    def __init__(self, log_every_steps: int = 10_000, verbose: int = 0):
+    def __init__(self, log_every_steps: int = 10_000, verbose: int = 0,
+                 elapsed_offset_sec: float = 0.0):
         super().__init__(verbose)
         self.log_every_steps = int(log_every_steps)
+        self.elapsed_offset_sec = float(elapsed_offset_sec)
         self._t0 = None
         self._last_log_t = None
         self._last_log_steps = 0
 
     def _on_training_start(self) -> None:
         now = time.time()
-        self._t0 = now
+        # elapsed_offset_sec shifts t0 into the past by however much wall-clock
+        # time this run had already accumulated before a crash/restart, so
+        # `elapsed` below picks up where the previous process left off instead
+        # of restarting from 0 -- the downtime in between is never counted,
+        # since it never falls inside any [_on_training_start, now) window.
+        self._t0 = now - self.elapsed_offset_sec
         self._last_log_t = now
-        self._last_log_steps = 0
+        self._last_log_steps = self.num_timesteps
 
     def _on_step(self) -> bool:
         if self.num_timesteps - self._last_log_steps < self.log_every_steps:
@@ -570,6 +577,34 @@ def main():
              "(that curve comes from --eval-freq instead).",
     )
     parser.add_argument(
+        "--resume-from", type=str, default=None,
+        help="Path to a ckpts/sac_her_hand_<N>_steps.zip saved by a previous "
+             "--task train run (e.g. after a crash/power loss). Loads the "
+             "model and its matching VecNormalize stats "
+             "(ckpts/sac_her_hand_vecnormalize_<N>_steps.pkl, same <N>, same "
+             "directory) and continues training for the remaining timesteps "
+             "up to --timesteps, writing new checkpoints/eval logs into the "
+             "same --save-dir. Combine with --resume-wandb-id to keep "
+             "logging into the same wandb run instead of starting a new one.",
+    )
+    parser.add_argument(
+        "--resume-wandb-id", type=str, default=None,
+        help="wandb run id to resume (from the crashed run's dashboard URL, "
+             ".../runs/<id>). Only used with --resume-from --wandb. Without "
+             "it, resuming still works but logs into a new wandb run, which "
+             "will double-count this seed when a wandb-group is averaged "
+             "across seeds for plotting.",
+    )
+    parser.add_argument(
+        "--resume-elapsed-sec", type=float, default=0.0,
+        help="Wall-clock seconds of ACTUAL training already accumulated by "
+             "the crashed run before it stopped (i.e. its last logged "
+             "time/elapsed_sec value, not wall-clock time since the crash). "
+             "Only used with --resume-from. Shifts this run's time/elapsed_sec "
+             "so it continues from that point instead of restarting at 0, "
+             "without counting the downtime in between.",
+    )
+    parser.add_argument(
         "--render", action="store_true",
         help="Open a live MuJoCo window during --task eval/collect "
              "(render_mode='human'), so you can watch (and screen-record) "
@@ -681,16 +716,25 @@ def main():
 
             run_name = args.wandb_run_name or os.path.basename(os.path.normpath(args.save_dir))
             tags = [t.strip() for t in args.wandb_tags.split(",")] if args.wandb_tags else None
-            wandb_run = wandb.init(
-                project=args.wandb_project,
-                entity=args.wandb_entity,
-                name=run_name,
-                group=args.wandb_group,
-                tags=tags,
-                config=vars(args),
-                sync_tensorboard=True,
-                dir=args.save_dir,
-            )
+            if args.resume_wandb_id:
+                wandb_run = wandb.init(
+                    project=args.wandb_project,
+                    entity=args.wandb_entity,
+                    id=args.resume_wandb_id,
+                    resume="must",
+                    dir=args.save_dir,
+                )
+            else:
+                wandb_run = wandb.init(
+                    project=args.wandb_project,
+                    entity=args.wandb_entity,
+                    name=run_name,
+                    group=args.wandb_group,
+                    tags=tags,
+                    config=vars(args),
+                    sync_tensorboard=True,
+                    dir=args.save_dir,
+                )
 
         if args.n_envs > 1:
             print(f"Parallel training envs: {args.n_envs} (SubprocVecEnv). "
@@ -716,29 +760,49 @@ def main():
         action_dim = train_env.action_space.shape[-1]
         target_entropy = -float(action_dim) * 0.8
 
-        model = SAC(
-            "MultiInputPolicy",
-            train_env,
-            replay_buffer_class=HerReplayBuffer,
-            replay_buffer_kwargs=dict(
-                n_sampled_goal=args.n_sampled_goal,
-                goal_selection_strategy="future",
-            ),
-            buffer_size=int(1e6),
-            batch_size=args.batch_size,
-            learning_rate=args.lr,
-            gamma=args.gamma,
-            learning_starts=args.learning_starts,
-            ent_coef="auto",
-            train_freq=1,
-            gradient_steps=args.gradient_steps,
-            policy_kwargs=dict(net_arch=dict(pi=[256, 256], qf=[256, 256])),
-            target_entropy=target_entropy,
-            verbose=1,
-            device=args.device,
-            seed=args.seed,
-            tensorboard_log=os.path.join(args.save_dir, "tb_logs"),
-        )
+        if args.resume_from:
+            # Reload the matching VecNormalize stats (same <N>_steps suffix,
+            # same ckpts/ dir) instead of the freshly-initialized ones that
+            # build_train_eval_envs* just created, then re-point the model at
+            # the now-correctly-normalized envs.
+            vecnorm_path = args.resume_from.replace(
+                "sac_her_hand_", "sac_her_hand_vecnormalize_"
+            ).replace(".zip", ".pkl")
+            print(f"Resuming from: {args.resume_from}")
+            print(f"  VecNormalize:  {vecnorm_path}")
+            train_env = VecNormalize.load(vecnorm_path, train_env.venv)
+            train_env.training = True
+            eval_env = VecNormalize.load(vecnorm_path, eval_env.venv)
+            eval_env.training = False
+            eval_env.norm_reward = False
+
+            model = SAC.load(args.resume_from, env=train_env, device=args.device)
+            print(f"  Resumed at {model.num_timesteps} timesteps "
+                  f"(target: {args.timesteps})")
+        else:
+            model = SAC(
+                "MultiInputPolicy",
+                train_env,
+                replay_buffer_class=HerReplayBuffer,
+                replay_buffer_kwargs=dict(
+                    n_sampled_goal=args.n_sampled_goal,
+                    goal_selection_strategy="future",
+                ),
+                buffer_size=int(1e6),
+                batch_size=args.batch_size,
+                learning_rate=args.lr,
+                gamma=args.gamma,
+                learning_starts=args.learning_starts,
+                ent_coef="auto",
+                train_freq=1,
+                gradient_steps=args.gradient_steps,
+                policy_kwargs=dict(net_arch=dict(pi=[256, 256], qf=[256, 256])),
+                target_entropy=target_entropy,
+                verbose=1,
+                device=args.device,
+                seed=args.seed,
+                tensorboard_log=os.path.join(args.save_dir, "tb_logs"),
+            )
 
         # EvalCallback/CheckpointCallback count calls to _on_step(), which fires
         # once per VecEnv round (i.e. once every n_envs real timesteps) rather
@@ -770,7 +834,10 @@ def main():
                 eval_env=eval_env,
                 verbose=1,
             ),
-            TimeLoggingCallback(log_every_steps=args.time_log_every),
+            TimeLoggingCallback(
+                log_every_steps=args.time_log_every,
+                elapsed_offset_sec=args.resume_elapsed_sec if args.resume_from else 0.0,
+            ),
         ]
 
         if wandb_run is not None:
@@ -783,7 +850,12 @@ def main():
             ))
 
         try:
-            model.learn(total_timesteps=args.timesteps, callback=callbacks)
+            if args.resume_from:
+                remaining = max(args.timesteps - model.num_timesteps, 0)
+                model.learn(total_timesteps=remaining, callback=callbacks,
+                            reset_num_timesteps=False)
+            else:
+                model.learn(total_timesteps=args.timesteps, callback=callbacks)
         finally:
             train_env.close()
             eval_env.close()
