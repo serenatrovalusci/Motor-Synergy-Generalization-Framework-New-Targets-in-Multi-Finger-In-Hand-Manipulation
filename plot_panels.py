@@ -126,14 +126,19 @@ def print_efficiency(label: str, curves, relative_threshold_frac: float):
         return f"{s // 3600}h {(s % 3600) // 60:02d}m"
 
     def fmt_group(name, ttt, wc, all_crossed):
-        if all_crossed:
-            steps_mean, steps_std = ttt.mean() / 1e6, ttt.std() / 1e6
-            wc_mean, wc_std = wc.mean(), wc.std()
-            print(f"    {name:8s} steps: {steps_mean:.3f}M +/- {steps_std:.3f}M  {[f'{v / 1e6:.3f}M' for v in ttt]}")
-            print(f"    {name:8s} time : {fmt_h(wc_mean)} +/- {fmt_h(wc_std)}  {[fmt_h(v) for v in wc]}")
-        else:
-            print(f"    {name:8s} steps: NOT REACHED by all seeds within budget  {[f'{v / 1e6:.3f}M' for v in ttt]}  (per-seed, end-of-training where censored)")
-            print(f"    {name:8s} time : NOT REACHED by all seeds within budget  {[fmt_h(v) for v in wc]}  (per-seed, end-of-training where censored)")
+        # time_to_threshold_per_seed already substitutes ts[-1] (end of the
+        # training budget) for any seed that never crosses, so the mean/std
+        # below is always a real number -- no blank "--" cells in the table,
+        # per the reviewer feedback that censored dashes made Tables II/III
+        # unreadable. `all_crossed` still gates a printed note so we (the
+        # authors) always know when a value includes a budget-end censored
+        # seed rather than a genuine crossing, even though the table itself
+        # shows a plain number either way.
+        steps_mean, steps_std = ttt.mean() / 1e6, ttt.std() / 1e6
+        wc_mean, wc_std = wc.mean(), wc.std()
+        note = "" if all_crossed else "  [right-censored: not all seeds crossed within budget]"
+        print(f"    {name:8s} steps: {steps_mean:.3f}M +/- {steps_std:.3f}M  {[f'{v / 1e6:.3f}M' for v in ttt]}{note}")
+        print(f"    {name:8s} time : {fmt_h(wc_mean)} +/- {fmt_h(wc_std)}  {[fmt_h(v) for v in wc]}{note}")
 
     print(f"  --- {label}  (peak={peak * 100:.1f}%, threshold={threshold * 100:.1f}%) ---")
     fmt_group("baseline", ttt_base, wc_base, base_all_crossed)
