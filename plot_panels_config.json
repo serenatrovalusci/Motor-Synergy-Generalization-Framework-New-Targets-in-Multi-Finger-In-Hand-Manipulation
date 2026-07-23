@@ -2,7 +2,6 @@
 {
   "objects": [
 
-
     {
       "name": "Small cube",
       "photo": "objects_shots/cropped/smallcube.png",
@@ -32,39 +31,6 @@
           "runs/no_sensor/smallblock_nosensor_synergy_K5_seed0",
           "runs/no_sensor/smallblock_nosensor_synergy_K5_seed1",
           "runs/no_sensor/smallblock_nosensor_synergy_K5_seed2"
-        ]
-      }
-    },
-
-    {
-      "name": "Large cube",
-      "photo": "objects_shots/cropped/bigcube.png",
-      "with_sensors": {
-        "baseline_wandb_group": "big_block_full",
-        "synergy_wandb_group": "big_block_synergy_K5",
-        "baseline_dirs": [
-          "runs/sensor/big_block_full_seed0",
-          "runs/sensor/big_block_full_seed1",
-          "runs/sensor/big_block_full_seed2"
-        ],
-        "synergy_dirs": [
-          "runs/sensor/big_block_synergy_K5_seed0",
-          "runs/sensor/big_block_synergy_K5_seed1",
-          "runs/sensor/big_block_synergy_K5_seed2"
-        ]
-      },
-      "no_sensors": {
-        "baseline_wandb_group": "big_block_nosensor_full",
-        "synergy_wandb_group": "big_block_nosensor_synergy_K5",
-        "baseline_dirs": [
-          "runs/no_sensor/big_block_nosensor_full_seed0",
-          "runs/no_sensor/big_block_nosensor_full_seed1",
-          "runs/no_sensor/big_block_nosensor_full_seed2"
-        ],
-        "synergy_dirs": [
-          "runs/no_sensor/big_block_nosensor_synergy_K5_seed0",
-          "runs/no_sensor/big_block_nosensor_synergy_K5_seed1",
-          "runs/no_sensor/big_block_nosensor_synergy_K5_seed2"
         ]
       }
     },
@@ -167,83 +133,7 @@
         ]
       }
     }
-
-
    
   ]
 }
 
-// (venv_ext) labs009@Alienware:~/serenat/paper_extension$ python plot_panels.py --config plot_panels_config.json --out plots/panels/mega_panel.pdf
-// wandb: [wandb.Api()] Loaded credentials for https://api.wandb.ai from /home/labs009/.netrc.
-//   --- Small cube -- With touch sensors  (peak=75.7%, threshold=60.5%) ---
-//     baseline steps: 3.000M +/- 0.000M  ['3.000M', '3.000M', '3.000M']  [right-censored: not all seeds crossed within budget]
-//     baseline time : 1h 49m +/- 0h 00m  ['1h 48m', '1h 49m', '1h 49m']  [right-censored: not all seeds crossed within budget]
-//     synergy  steps: 2.167M +/- 0.236M  ['2.000M', '2.000M', '2.500M']
-//     synergy  time : 1h 17m +/- 0h 07m  ['1h 12m', '1h 11m', '1h 28m']
-//   --- Small cube -- Without touch sensors  (peak=66.3%, threshold=53.1%) ---
-//     baseline steps: 3.000M +/- 0.000M  ['3.000M', '3.000M', '3.000M']  [right-censored: not all seeds crossed within budget]
-//     baseline time : 1h 42m +/- 0h 00m  ['1h 41m', '1h 43m', '1h 42m']  [right-censored: not all seeds crossed within budget]
-//     synergy  steps: 2.667M +/- 0.236M  ['2.500M', '2.500M', '3.000M']
-//     synergy  time : 1h 27m +/- 0h 07m  ['1h 22m', '1h 22m', '1h 37m']
-//   --- Large cube -- With touch sensors  (peak=68.3%, threshold=54.7%) ---
-//     baseline steps: 3.000M +/- 0.000M  ['3.000M', '3.000M', '3.000M']  [right-censored: not all seeds crossed within budget]
-//     baseline time : 1h 49m +/- 0h 01m  ['1h 49m', '1h 47m', '1h 50m']  [right-censored: not all seeds crossed within budget]
-//     synergy  steps: 2.333M +/- 0.236M  ['2.500M', '2.000M', '2.500M']
-//     synergy  time : 1h 23m +/- 0h 08m  ['1h 29m', '1h 11m', '1h 30m']
-//   --- Large cube -- Without touch sensors  (peak=59.0%, threshold=47.2%) ---
-//     baseline steps: 3.000M +/- 0.000M  ['3.000M', '3.000M', '3.000M']  [right-censored: not all seeds crossed within budget]
-//     baseline time : 1h 3m +/- 0h 04m  ['1h 42m', '1h 45m', '1h 52m']  [right-censored: not all seeds crossed within budget]
-//     synergy  steps: 1.500M +/- 0.000M  ['1.500M', '1.500M', '1.500M']
-//     synergy  time : 0h 58m +/- 0h 04m  ['1h 02m', '1h 01m', '0h 51m']
-//   --- Egg -- With touch sensors  (peak=99.7%, threshold=79.7%) ---
-//     baseline steps: 2.000M +/- 0.000M  ['2.000M', '2.000M', '2.000M']
-//     baseline time : 1h 11m +/- 0h 00m  ['1h 12m', '1h 11m', '1h 11m']
-//     synergy  steps: 0.833M +/- 0.236M  ['1.000M', '1.000M', '0.500M']
-//     synergy  time : 0h 31m +/- 0h 08m  ['0h 37m', '0h 37m', '0h 19m']
-//   --- Egg -- Without touch sensors  (peak=98.7%, threshold=78.9%) ---
-//     baseline steps: 3.000M +/- 0.000M  ['3.000M', '3.000M', '3.000M']
-//     baseline time : 1h 42m +/- 0h 02m  ['1h 46m', '1h 40m', '1h 40m']
-//     synergy  steps: 1.000M +/- 0.000M  ['1.000M', '1.000M', '1.000M']
-//     synergy  time : 0h 34m +/- 0h 00m  ['0h 34m', '0h 34m', '0h 34m']
-//   --- Sphere -- With touch sensors  (peak=100.0%, threshold=80.0%) ---
-//     baseline steps: 2.333M +/- 0.236M  ['2.500M', '2.500M', '2.000M']
-//     baseline time : 1h 25m +/- 0h 09m  ['1h 31m', '1h 32m', '1h 12m']
-//     synergy  steps: 1.000M +/- 0.000M  ['1.000M', '1.000M', '1.000M']
-//     synergy  time : 0h 37m +/- 0h 00m  ['0h 38m', '0h 37m', '0h 37m']
-//   --- Sphere -- Without touch sensors  (peak=100.0%, threshold=80.0%) ---
-//     baseline steps: 2.833M +/- 0.236M  ['3.000M', '2.500M', '3.000M']
-//     baseline time : 1h 37m +/- 0h 09m  ['1h 42m', '1h 24m', '1h 44m']
-//     synergy  steps: 1.000M +/- 0.000M  ['1.000M', '1.000M', '1.000M']
-//     synergy  time : 0h 34m +/- 0h 00m  ['0h 34m', '0h 34m', '0h 34m']9m +/- 0h 00m  ['1h 38m', '1h 38m', '1h 39m']  [right-censored: not all seeds crossed within budget]
-//     synergy  steps: 3.000M +/- 0.000M  ['3.000M', '3.000M', '3.000M']
-//     synergy  time : 1h 38m +/- 0h 01m  ['1h 38m', '1h 38m', '1h 40m']
-//   --- Cylinder -- With touch sensors  (peak=94.7%, threshold=75.7%) ---
-//     baseline steps: 2.833M +/- 0.236M  ['2.500M', '3.000M', '3.000M']  [right-censored: not all seeds crossed within budget]
-//     baseline time : 1h 43m +/- 0h 08m  ['1h 31m', '1h 49m', '1h 48m']  [right-censored: not all seeds crossed within budget]
-//     synergy  steps: 1.333M +/- 0.236M  ['1.500M', '1.500M', '1.000M']
-//     synergy  time : 0h 49m +/- 0h 08m  ['0h 55m', '0h 54m', '0h 37m']
-//   --- Cylinder -- Without touch sensors  (peak=92.3%, threshold=73.9%) ---
-//     baseline steps: 3.000M +/- 0.000M  ['3.000M', '3.000M', '3.000M']  [right-censored: not all seeds crossed within budget]
-//     baseline time : 1h 46m +/- 0h 04m  ['1h 42m', '1h 45m', '1h 52m']  [right-censored: not all seeds crossed within budget]
-//     synergy  steps: 1.500M +/- 0.000M  ['1.500M', '1.500M', '1.500M']
-//     synergy  time : 0h 58m +/- 0h 04m  ['1h 02m', '1h 01m', '0h 51m']
-//   --- Egg -- With touch sensors  (peak=99.7%, threshold=79.7%) ---
-//     baseline steps: 2.000M +/- 0.000M  ['2.000M', '2.000M', '2.000M']
-//     baseline time : 1h 11m +/- 0h 00m  ['1h 12m', '1h 11m', '1h 11m']
-//     synergy  steps: 0.833M +/- 0.236M  ['1.000M', '1.000M', '0.500M']
-//     synergy  time : 0h 31m +/- 0h 08m  ['0h 37m', '0h 37m', '0h 19m']
-//   --- Egg -- Without touch sensors  (peak=98.7%, threshold=78.9%) ---
-//     baseline steps: 3.000M +/- 0.000M  ['3.000M', '3.000M', '3.000M']
-//     baseline time : 1h 42m +/- 0h 02m  ['1h 46m', '1h 40m', '1h 40m']
-//     synergy  steps: 1.000M +/- 0.000M  ['1.000M', '1.000M', '1.000M']
-//     synergy  time : 0h 34m +/- 0h 00m  ['0h 34m', '0h 34m', '0h 34m']
-//   --- Sphere -- With touch sensors  (peak=100.0%, threshold=80.0%) ---
-//     baseline steps: 2.333M +/- 0.236M  ['2.500M', '2.500M', '2.000M']
-//     baseline time : 1h 25m +/- 0h 09m  ['1h 31m', '1h 32m', '1h 12m']
-//     synergy  steps: 1.000M +/- 0.000M  ['1.000M', '1.000M', '1.000M']
-//     synergy  time : 0h 37m +/- 0h 00m  ['0h 38m', '0h 37m', '0h 37m']
-//   --- Sphere -- Without touch sensors  (peak=100.0%, threshold=80.0%) ---
-//     baseline steps: 2.833M +/- 0.236M  ['3.000M', '2.500M', '3.000M']
-//     baseline time : 1h 37m +/- 0h 09m  ['1h 42m', '1h 24m', '1h 44m']
-//     synergy  steps: 1.000M +/- 0.000M  ['1.000M', '1.000M', '1.000M']
-//     synergy  time : 0h 34m +/- 0h 00m  ['0h 34m', '0h 34m', '0h 34m']
