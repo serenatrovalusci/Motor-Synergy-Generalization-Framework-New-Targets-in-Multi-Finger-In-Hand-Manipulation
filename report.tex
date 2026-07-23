@@ -263,7 +263,7 @@ reach it within a rotational tolerance of $\epsilon_r = 0.1$\,rad and a
 positional tolerance of $\epsilon_p = 1$\,cm. The reward is sparse and
 binary: the agent receives $0$ upon success and $-1$ otherwise. The
 control frequency is 25\,Hz, and each episode lasts a fixed $T = 100$
-simulation steps regardless of task completion, as these tasks are non-time-dependent continuing tasks with no early termination on success. Following the hand-manipulation environments of \cite{c16}, the observation includes the 24 joint positions and velocities of the Shadow Dexterous Hand, together with the manipulated object's Cartesian position and quaternion orientation, and its linear and angular velocities. We consider two observation conditions: a base condition using this state alone, and a touch-sensor condition that augments it with 92 continuous tactile readings distributed across the hand surface.
+simulation steps regardless of task completion. Following the hand-manipulation environments of \cite{c16}, the observation includes the 24 joint positions and velocities of the Shadow Dexterous Hand, together with the manipulated object's Cartesian position and quaternion orientation, and its linear and angular velocities. We consider two observation conditions: a base condition using this state alone, and a touch-sensor condition that augments it with 92 continuous tactile readings distributed across the hand surface.
 
 We report two complementary success criteria throughout this paper.
 Under the \emph{sustained-hold} criterion, an episode is successful if
@@ -390,53 +390,52 @@ Success rate is estimated under the two definitions introduced in Section~\ref{s
 
 \begin{figure*}[t]
     \centering
-    \includegraphics[width=\textwidth]{figures/panels/large_cube.pdf}\\[-4pt]
-    \includegraphics[width=\textwidth]{figures/panels/egg.pdf}\\[-4pt]
-    \includegraphics[width=\textwidth]{figures/panels/cylinder.pdf}\\[-4pt]
-    \includegraphics[width=\textwidth]{figures/panels/sphere.pdf}
-    \caption{Sustained-hold and reorientation success rate (mean $\pm$ std over 3 seeds), with and without touch sensors, for each evaluated target object.}
+    \includegraphics[width=\textwidth]{figures/panels/mega_panel.pdf}\\[-4pt]
+    
+    \caption{Reorientation success rate (mean $\pm$ std over 3 seeds), with and without touch sensors, for each target object.}
     \label{fig:curves-all}
 \end{figure*}
 
 
 \begin{table}[t]
-    \caption{Sampling duration to sustained-hold threshold (timesteps, $\times 10^6$). BL = baseline, SC = synergy-constrained. Values are mean $\pm$ std across seeds that cross the threshold; "--" = not reached by all seeds within budget.}
-    \label{tab:steps}
+    \caption{Sampling duration and wall-clock time to reorientation
+    threshold, touch-sensor condition. BL = baseline, SC =
+    synergy-constrained. Steps in millions ($\times10^6$), mean $\pm$
+    std across seeds.}
+    \label{tab:sensor}
     \begin{center}
-    \begin{tabular}{llcc}
+    \footnotesize
+    \begin{tabular}{lcccc}
     \hline
-    \textbf{Object} & \textbf{Sensors} & \textbf{BL} & \textbf{SC} \\
+    \textbf{Object} & \textbf{BL steps} & \textbf{SC steps} & \textbf{BL time} & \textbf{SC time} \\
     \hline
-    Large cube & yes & -- & $2.03 \pm 0.24$ \\
-    Large cube & no  & -- & $2.63 \pm 0.33$ \\
-    Egg        & yes & $2.23 \pm 0.17$ & $1.57 \pm 0.13$ \\
-    Egg        & no  & -- & $1.80 \pm 0.22$ \\
-    Cylinder   & yes & -- & $1.87 \pm 0.13$ \\
-    Cylinder   & no  & -- & $1.67 \pm 0.13$ \\
-    Sphere     & yes & $1.87 \pm 0.13$ & $0.77 \pm 0.13$ \\
-    Sphere     & no  & $2.63 \pm 0.25$ & $0.87 \pm 0.17$ \\
+    Large cube & $3.00\pm0.00$ & $2.33\pm0.24$ & $1$h$49$m$\pm1$m & $1$h$23$m$\pm8$m \\
+    Cylinder   & $2.83\pm0.24$ & $1.00\pm0.00$ & $1$h$43$m$\pm8$m & $0$h$37$m$\pm0$m \\
+    Sphere     & $2.00\pm0.00$         & $1.00\pm0.00$ & $1$h$13$m$\pm0$m          & $0$h$37$m$\pm0$m \\
+    Egg        & $1.83\pm0.24$         & $0.83\pm0.24$ & $1$h$06$m$\pm8$m          & $0$h$31$m$\pm8$m \\
     \hline
     \end{tabular}
     \end{center}
 \end{table}
 
 
+
 \begin{table}[t]
-    \caption{Wall-clock time to sustained-hold threshold. BL = baseline, SC = synergy-constrained. Values are mean $\pm$ std across seeds that cross the threshold; "--" = not reached by all seeds within budget.}
-    \label{tab:time}
+    \caption{Sampling duration and wall-clock time to reorientation
+    threshold, touch-free condition. BL = baseline, SC =
+    synergy-constrained. Steps in millions ($\times10^6$), mean $\pm$
+    std across seeds.}
+    \label{tab:nosensor}
     \begin{center}
-    \begin{tabular}{llcc}
+    \footnotesize
+    \begin{tabular}{lcccc}
     \hline
-    \textbf{Object} & \textbf{Sensors} & \textbf{BL} & \textbf{SC} \\
+    \textbf{Object} & \textbf{BL steps} & \textbf{SC steps} & \textbf{BL time} & \textbf{SC time} \\
     \hline
-    Large cube & yes & -- & $1$h$13$m $\pm 8$m \\
-    Large cube & no  & -- & $1$h$27$m $\pm 10$m \\
-    Egg        & yes & $1$h$19$m $\pm 6$m & $0$h$57$m $\pm 4$m \\
-    Egg        & no  & -- & $1$h$00$m $\pm 6$m \\
-    Cylinder   & yes & -- & $1$h$07$m $\pm 4$m \\
-    Cylinder   & no  & -- & $1$h$05$m $\pm 7$m \\
-    Sphere     & yes & $1$h$08$m $\pm 5$m & $0$h$29$m $\pm 4$m \\
-    Sphere     & no  & $1$h$30$m $\pm 9$m & $0$h$30$m $\pm 5$m \\
+    Large cube & $3.00\pm0.00$ & $3.00\pm0.00$ & $1$h$39$m$\pm0$m & $1$h$38$m$\pm1$m \\
+    Cylinder   & $3.00\pm0.00$ & $1.50\pm0.00$ & $1$h$46$m$\pm4$m & $0$h$58$m$\pm4$m \\
+    Sphere     & $2.83\pm0.24$         & $1.00\pm0.00$ & $1$h$37$m$\pm9$m          & $0$h$34$m$\pm0$m \\
+    Egg        & $2.83\pm0.24$         & $0.83\pm0.24$ & $1$h$37$m$\pm5$m          & $0$h$28$m$\pm7$m \\
     \hline
     \end{tabular}
     \end{center}

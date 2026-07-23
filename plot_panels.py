@@ -81,24 +81,34 @@ def time_to_threshold_per_seed(ts, stacked, threshold: float):
     for every seed (giving a meaningless std of exactly 0). Here each seed's
     own curve is checked independently.
 
-    Returns (crossing_times, all_crossed):
+    Returns (crossing_times, crossed, all_crossed):
       crossing_times[i] = ts[idx] of the first point where seed i's own
-        curve reaches `threshold`, or ts[-1] if it never does.
-      all_crossed = False if any seed never crosses -- callers should not
+        curve reaches `threshold`, or ts[-1] (the end of the available
+        training budget) as a right-censored placeholder if it never does.
+      crossed[i] = True if seed i actually reached `threshold` at some point
+        within the training budget (even if only at the very last
+        checkpoint), False if it never reached `threshold` at all. This is
+        what distinguishes a genuine last-checkpoint crossing from a seed
+        that never crossed -- both otherwise report the same ts[-1] value
+        in crossing_times.
+      all_crossed = False if any seed never crossed -- callers should not
         report a mean +- std over crossing_times in that case, since it
         would silently blend a real crossing time with an end-of-training
         placeholder.
     """
     crossing_times = []
+    crossed = []
     all_crossed = True
     for seed_curve in stacked:
         idx = np.where(seed_curve >= threshold)[0]
         if len(idx) > 0:
             crossing_times.append(float(ts[idx[0]]))
+            crossed.append(True)
         else:
             crossing_times.append(float(ts[-1]))
+            crossed.append(False)
             all_crossed = False
-    return np.array(crossing_times), all_crossed
+    return np.array(crossing_times), np.array(crossed), all_crossed
 
 
 def print_efficiency(label: str, curves, relative_threshold_frac: float):
@@ -106,18 +116,18 @@ def print_efficiency(label: str, curves, relative_threshold_frac: float):
     Print sample- and wall-clock-efficiency (timesteps/time to cross a
     relative threshold) for one reorientation cell, using per-seed crossing
     times so the reported spread is a real mean +- std across seeds (see
-    time_to_threshold_per_seed). Explicitly reports "NOT REACHED" instead of
-    a mean +- std when at least one seed never crosses -- averaging in an
-    end-of-training placeholder would understate the true (unknown,
-    censored) crossing time.
+    time_to_threshold_per_seed). Individual seeds that never crossed within
+    the training budget are marked with a trailing "*" in the per-seed
+    lists, so a genuine crossing at the last checkpoint is never visually
+    indistinguishable from a seed that simply never got there.
     """
     ts_base, succ_base, ts_syn, succ_syn, base_runs, syn_runs = curves
 
     peak = max(succ_base.mean(axis=0).max(), succ_syn.mean(axis=0).max())
     threshold = relative_threshold_frac * float(peak) if peak < 1.0 else 0.80
 
-    ttt_base, base_all_crossed = time_to_threshold_per_seed(ts_base, succ_base, threshold)
-    ttt_syn, syn_all_crossed = time_to_threshold_per_seed(ts_syn, succ_syn, threshold)
+    ttt_base, crossed_base, base_all_crossed = time_to_threshold_per_seed(ts_base, succ_base, threshold)
+    ttt_syn, crossed_syn, syn_all_crossed = time_to_threshold_per_seed(ts_syn, succ_syn, threshold)
     wc_base = plot_lib.wall_clock_to_threshold_wandb(base_runs, ttt_base)
     wc_syn = plot_lib.wall_clock_to_threshold_wandb(syn_runs, ttt_syn)
 
@@ -125,24 +135,20 @@ def print_efficiency(label: str, curves, relative_threshold_frac: float):
         s = int(s)
         return f"{s // 3600}h {(s % 3600) // 60:02d}m"
 
-    def fmt_group(name, ttt, wc, all_crossed):
-        # time_to_threshold_per_seed already substitutes ts[-1] (end of the
-        # training budget) for any seed that never crosses, so the mean/std
-        # below is always a real number -- no blank "--" cells in the table,
-        # per the reviewer feedback that censored dashes made Tables II/III
-        # unreadable. `all_crossed` still gates a printed note so we (the
-        # authors) always know when a value includes a budget-end censored
-        # seed rather than a genuine crossing, even though the table itself
-        # shows a plain number either way.
+    def fmt_group(name, ttt, wc, crossed, all_crossed):
         steps_mean, steps_std = ttt.mean() / 1e6, ttt.std() / 1e6
         wc_mean, wc_std = wc.mean(), wc.std()
         note = "" if all_crossed else "  [right-censored: not all seeds crossed within budget]"
-        print(f"    {name:8s} steps: {steps_mean:.3f}M +/- {steps_std:.3f}M  {[f'{v / 1e6:.3f}M' for v in ttt]}{note}")
-        print(f"    {name:8s} time : {fmt_h(wc_mean)} +/- {fmt_h(wc_std)}  {[fmt_h(v) for v in wc]}{note}")
+
+        steps_list = [f"{v / 1e6:.3f}M{'' if c else '*'}" for v, c in zip(ttt, crossed)]
+        wc_list = [f"{fmt_h(v)}{'' if c else '*'}" for v, c in zip(wc, crossed)]
+
+        print(f"    {name:8s} steps: {steps_mean:.3f}M +/- {steps_std:.3f}M  {steps_list}{note}")
+        print(f"    {name:8s} time : {fmt_h(wc_mean)} +/- {fmt_h(wc_std)}  {wc_list}{note}")
 
     print(f"  --- {label}  (peak={peak * 100:.1f}%, threshold={threshold * 100:.1f}%) ---")
-    fmt_group("baseline", ttt_base, wc_base, base_all_crossed)
-    fmt_group("synergy", ttt_syn, wc_syn, syn_all_crossed)
+    fmt_group("baseline", ttt_base, wc_base, crossed_base, base_all_crossed)
+    fmt_group("synergy", ttt_syn, wc_syn, crossed_syn, syn_all_crossed)
 
 
 def draw_cell(ax, curves, relative_threshold_frac: float):
