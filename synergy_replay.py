@@ -3,6 +3,7 @@ import pickle
 import gymnasium as gym
 import gymnasium_robotics
 import argparse
+import mujoco_compat  # noqa: F401  (Python 3.14 patch for gymnasium_robotics)
 from typing import Optional
 
 def eval_synergy_replay(

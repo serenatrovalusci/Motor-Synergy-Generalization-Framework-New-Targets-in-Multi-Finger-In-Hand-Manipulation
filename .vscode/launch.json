@@ -1,0 +1,32 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Play egg (window)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/demo/play.py",
+      "args": ["--model-dir", "models/full_action/egg", "--episodes", "3"],
+      "env": { "MUJOCO_GL": "glfw" },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Record egg video",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/demo/play.py",
+      "args": ["--model-dir", "models/full_action/egg", "--episodes", "3", "--video", "demo/egg_full_action.mp4"],
+      "env": { "MUJOCO_GL": "egl" },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Record cube video",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/demo/play.py",
+      "args": ["--env-id", "HandManipulateBlockRotateXYZ_ContinuousTouchSensors-v1", "--model-dir", "models/full_action/large_cube", "--episodes", "3", "--video", "demo/cube_full_action.mp4"],
+      "env": { "MUJOCO_GL": "egl" },
+      "console": "integratedTerminal"
+    }
+  ]
+}

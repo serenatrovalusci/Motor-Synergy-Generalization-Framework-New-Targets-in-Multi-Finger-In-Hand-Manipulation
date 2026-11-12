@@ -87,6 +87,7 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
+import mujoco_compat  # noqa: F401  (Python 3.14 patch for gymnasium_robotics)
 
 # =============================================================================
 # Callbacks
@@ -499,6 +500,10 @@ def main():
         choices=["auto", "cpu", "cuda", "mps"],
     )
     parser.add_argument("--torch-threads", type=int, default=4)
+    parser.add_argument(
+        "--render", action="store_true",
+        help="Open the MuJoCo viewer during --task eval / collect.",
+    )
     parser.add_argument("--seed", type=int, default=0)
 
     args = parser.parse_args()
@@ -615,6 +620,10 @@ def main():
     # =========================================================================
     model_path = os.path.join(args.save_dir, "best", "best_model.zip")
     vecnorm_path = os.path.join(args.save_dir, "best", "vecnorm_best.pkl")
+    # Released models (models/...) store the files directly in save-dir
+    if not os.path.exists(model_path):
+        model_path = os.path.join(args.save_dir, "best_model.zip")
+        vecnorm_path = os.path.join(args.save_dir, "vecnorm_best.pkl")
 
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"No best model found at {model_path}")
@@ -622,12 +631,13 @@ def main():
         raise FileNotFoundError(f"No VecNormalize found at {vecnorm_path}")
 
     if args.full_action_space:
-        raw_env = DummyVecEnv([make_full_env(args.env_id)])
+        raw_env = DummyVecEnv([make_full_env(args.env_id, render=args.render)])
     else:
         raw_env = DummyVecEnv([make_synergy_env(
             args.env_id, synergy_model,
             act_scale=args.act_scale,
             nonnegative_activities=args.nonnegative_activities,
+            render=args.render,
         )])
 
     eval_env = VecNormalize.load(vecnorm_path, raw_env)
